@@ -56,7 +56,7 @@ struct CreateNewVMView: View {
     @State private var selectedVMType = VMType.macOS
     @State private var linuxKernelPath: URL?
     @State private var customIpswURL: URL?
-    @State private var vmName = "macOS VM"
+    @State private var vmName = "macOS VM" // TODO: Handle special characters
     @State private var useCustomIpsw = false
     @State private var vmPath: URL = FileManager.default.homeDirectoryForCurrentUser
     
@@ -247,6 +247,12 @@ struct CreateNewVMView: View {
                         .progressViewStyle(.linear)
                         .frame(width: 300)
                 }
+            case .creatingAuxFiles:
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                        .frame(width: 300)
+                }
             case let .installFraction(fraction):
                 VStack(spacing: 12) {
                     ProgressView(value: fraction, total: 1.0)
@@ -257,7 +263,12 @@ struct CreateNewVMView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                
+            case .cleanup:
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                        .frame(width: 300)
+                }
             case .complete:
                 VStack(spacing: 16) {
                     Image(systemName: "checkmark.circle.fill")
@@ -328,7 +339,9 @@ struct CreateNewVMView: View {
         switch progress {
         case .downloadFraction: "arrow.down.circle.fill"
         case .copyingRestoreFile: "document.on.document.fill"
+        case .creatingAuxFiles: "plus.circle.fill"
         case .installFraction: "gearshape.2.fill"
+        case .cleanup: "trash.circle.fill"
         case .complete: "checkmark.circle.fill"
         }
     }
@@ -336,8 +349,10 @@ struct CreateNewVMView: View {
     private func titleForProgress(_ progress: NewVMProgress) -> String {
         switch progress {
         case .downloadFraction: "Downloading macOS"
+        case .creatingAuxFiles: "Creating Auxiliary Files"
         case .copyingRestoreFile: "Copying Restore File"
         case .installFraction: "Installing Virtual Machine"
+        case .cleanup: "Cleaning Up"
         case .complete: "Installation Complete"
         }
     }
@@ -346,7 +361,9 @@ struct CreateNewVMView: View {
         switch progress {
         case .downloadFraction: "Downloading the latest macOS restore image from Apple"
         case .copyingRestoreFile: "Copying the selected restore file to the location of your virtual machine"
+        case .creatingAuxFiles: "Creating necessary files for the installation process"
         case .installFraction: "Installing macOS to the virtual machine disk"
+        case .cleanup: "Cleaning up temporary files"
         case .complete: "Your virtual machine has been created successfully"
         }
     }

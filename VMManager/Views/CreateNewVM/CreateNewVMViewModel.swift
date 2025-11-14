@@ -10,6 +10,7 @@ enum NewVMError: Error {
     case whileFetchingLatestSupported(Error)
     case whileDownloadingRestoreImage(Error)
     case whileDownloadingRestoreImageNoLocalURL
+    case whileCleaningUpRestoreImage(Error)
     case whileLoadingIpswFile(at: URL, Error)
     case couldNotMoveFile(from: URL, to: URL, error: Error)
     case failedToLaunchDiskUtil(Error)
@@ -27,8 +28,10 @@ enum ProgressReport {
 enum NewVMProgress: Equatable, Identifiable {
     case downloadFraction(Double)
     case copyingRestoreFile
+    case creatingAuxFiles
     case installFraction(Double)
 //    case error(Error) // TODO: - Set error if there was a failure, handle presenting to the user in View
+    case cleanup
     case complete
     
     var id: String {
@@ -37,8 +40,12 @@ enum NewVMProgress: Equatable, Identifiable {
             "download_\(fraction)"
         case .copyingRestoreFile:
             "copying_restore_file"
+        case .creatingAuxFiles:
+            "creating_aux_files"
         case let .installFraction(fraction):
             "install_\(fraction)"
+        case .cleanup:
+            "cleanup"
         case .complete:
             "complete"
         }
@@ -136,9 +143,14 @@ class CreateNewVMViewModel {
             }
         }
         
-        try await setUpVirtualMachineArtifacts(paths: bundlePath)
+        try await setUpVirtualMachineAuxiliaryFiles(paths: bundlePath)
         
         try await startInstallation(paths: bundlePath)
+        
+        try await cleanup(paths: bundlePath)
+        
+        progress = .complete
+        
         return bookmarkData
     }
     
@@ -201,7 +213,25 @@ class CreateNewVMViewModel {
         }
     }
     
-    func setUpVirtualMachineArtifacts(paths: VmBundlePath) async throws(NewVMError) {
+    private func cleanup(paths: VmBundlePath) async throws(NewVMError) {
+        progress = .cleanup
+        
+        try await deleteRestoreImage(paths: paths)
+    }
+    
+    private func deleteRestoreImage(paths: VmBundlePath) async throws(NewVMError) {
+        do {
+            try await Task.detached(name: "Delete restore image", priority: .userInitiated) {
+                try FileManager.default.removeItem(at: paths.restoreImageURL)
+            }.value
+        } catch {
+            throw .whileCleaningUpRestoreImage(error)
+        }
+    }
+    
+    private func setUpVirtualMachineAuxiliaryFiles(paths: VmBundlePath) async throws(NewVMError) {
+        progress = .creatingAuxFiles
+        
         try await createDiskImage(sizeInGiB: launchOptions.storageGb, paths: paths)
         try createMetadata(paths: paths)
     }
@@ -228,14 +258,10 @@ class CreateNewVMViewModel {
             for try await value in startInstallation(restoreImageURL: paths.restoreImageURL, virtualMachine: virtualMachine) {
                 progress = .installFraction(value)
             }
-            
-            // TODO: - Delete restore image
         } catch {
             progress = nil
             throw error as! NewVMError
         }
-        
-        progress = .complete
     }
 
     // TODO: Refactor into extension on VZMacOSRestoreImage
@@ -292,32 +318,26 @@ class CreateNewVMViewModel {
     private func createDiskImage(sizeInGiB: UInt, paths: VmBundlePath) async throws(NewVMError) {
         do {
             try await Task.detached(name: "Create Disk Image", priority: .userInitiated) {
-                do {
-                    let process = try Process.run(
-                        URL(fileURLWithPath: "/usr/sbin/diskutil"),
-                        arguments: [
-                            "image", "create", "blank",
-                            "--fs", "none", "--format",
-                            "ASIF", "--size", "\(sizeInGiB)GiB",
-                            paths.diskImageURL.path(percentEncoded: false)
-                        ]
-                    )
-                    
-                    process.waitUntilExit()
-                    
-                    if process.terminationStatus != 0 {
-                        throw NewVMError.failedToCreateDiskImage(terminationStatus: process.terminationStatus)
-                    }
-                } catch let error as NewVMError {
-                    throw error
-                } catch {
-                    throw NewVMError.failedToLaunchDiskUtil(error)
+                let process = try Process.run(
+                    URL(fileURLWithPath: "/usr/sbin/diskutil"),
+                    arguments: [
+                        "image", "create", "blank",
+                        "--fs", "none", "--format",
+                        "ASIF", "--size", "\(sizeInGiB)GiB",
+                        paths.diskImageURL.path(percentEncoded: false)
+                    ]
+                )
+                
+                process.waitUntilExit()
+                
+                if process.terminationStatus != 0 {
+                    throw NewVMError.failedToCreateDiskImage(terminationStatus: process.terminationStatus)
                 }
             }.value
         } catch let error as NewVMError {
             throw error
         } catch {
-            fatalError("This should never occur, as only NewVMErrors are thrown in Task body.")
+            throw NewVMError.failedToLaunchDiskUtil(error)
         }
     }
     
