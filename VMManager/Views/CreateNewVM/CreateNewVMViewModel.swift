@@ -228,6 +228,8 @@ class CreateNewVMViewModel {
             for try await value in startInstallation(restoreImageURL: paths.restoreImageURL, virtualMachine: virtualMachine) {
                 progress = .installFraction(value)
             }
+            
+            // TODO: - Delete restore image
         } catch {
             progress = nil
             throw error as! NewVMError
