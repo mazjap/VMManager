@@ -5,7 +5,6 @@ import SwiftData
 // Handle relevant TODOs
 // Seperation of concerns/better project structure
 // Resize disk image
-// Deleting the restore image after installed
 
 @main
 struct VMManagerApp: App {
