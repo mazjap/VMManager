@@ -1,6 +1,7 @@
 import Foundation
 
-struct LaunchOptions: Codable {
+nonisolated
+struct LaunchOptions: Hashable, Codable {
     var cpuCores: UInt = 0
     var memoryGb: UInt = 0
     var storageGb: UInt = 0
