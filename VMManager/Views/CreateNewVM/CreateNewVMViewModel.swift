@@ -234,7 +234,7 @@ class CreateNewVMViewModel {
         progress = .creatingAuxFiles
         
         try await createDiskImage(sizeInGiB: launchOptions.storageGb, paths: paths)
-        try createMetadata(paths: paths)
+        try await createMetadata(paths: paths)
     }
     
     private func startInstallation(paths: VmBundlePath) async throws(NewVMError) {
@@ -327,12 +327,14 @@ class CreateNewVMViewModel {
         }
     }
     
-    private func createMetadata(paths: VmBundlePath) throws(NewVMError) {
+    private func createMetadata(paths: VmBundlePath) async throws(NewVMError) {
         let binaryCoder = BinaryMetadataCoder()
         let data = binaryCoder.encode(launchOptions)
         
         do {
-            try data.write(to: paths.metaDataURL)
+            try await Task.detached(name: "Save Launch Options", priority: .userInitiated) {
+                try data.write(to: paths.metaDataURL)
+            }.value
         } catch {
             throw .whileSettingUpAuxFiles(error)
         }
