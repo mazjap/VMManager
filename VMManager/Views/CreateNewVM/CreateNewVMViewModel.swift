@@ -57,6 +57,7 @@ enum NewVMProgress: Equatable, Identifiable {
 class CreateNewVMViewModel {
     private(set) var progress: NewVMProgress?
     var launchOptions = VMConfigHelper.defaultLaunchOptions
+    private let diskUtilityClient = DiskUtilityClient()
     
     func isDownloading() -> Bool {
         ![NewVMProgress.complete, nil].contains(progress)
@@ -314,25 +315,10 @@ class CreateNewVMViewModel {
         }
     }
     
-    @available(macOS 16.0, *)
     private func createDiskImage(sizeInGiB: UInt, paths: VmBundlePath) async throws(NewVMError) {
         do {
             try await Task.detached(name: "Create Disk Image", priority: .userInitiated) {
-                let process = try Process.run(
-                    URL(fileURLWithPath: "/usr/sbin/diskutil"),
-                    arguments: [
-                        "image", "create", "blank",
-                        "--fs", "none", "--format",
-                        "ASIF", "--size", "\(sizeInGiB)GiB",
-                        paths.diskImageURL.path(percentEncoded: false)
-                    ]
-                )
-                
-                process.waitUntilExit()
-                
-                if process.terminationStatus != 0 {
-                    throw NewVMError.failedToCreateDiskImage(terminationStatus: process.terminationStatus)
-                }
+                try await self.diskUtilityClient.createDiskImage(at: paths.diskImageURL, sizeInGiB: sizeInGiB)
             }.value
         } catch let error as NewVMError {
             throw error

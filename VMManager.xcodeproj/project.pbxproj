@@ -8,11 +8,37 @@
 
 /* Begin PBXBuildFile section */
 		0EC2886D2EC792FD007B9429 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 0EC2886C2EC792FD007B9429 /* README.md */; };
+		0EC5C6652ECA41120017896E /* DiskUtilityHelper.xpc in Embed XPC Services */ = {isa = PBXBuildFile; fileRef = 0EC5C65A2ECA41120017896E /* DiskUtilityHelper.xpc */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		0EC5C6632ECA41120017896E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0E860AEA2E27F0C9003B18B4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0EC5C6592ECA41120017896E;
+			remoteInfo = DiskUtilityHelper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		0EC5C66A2ECA41120017896E /* Embed XPC Services */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/XPCServices";
+			dstSubfolderSpec = 16;
+			files = (
+				0EC5C6652ECA41120017896E /* DiskUtilityHelper.xpc in Embed XPC Services */,
+			);
+			name = "Embed XPC Services";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0E860AF22E27F0C9003B18B4 /* VMManager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VMManager.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0EC2886C2EC792FD007B9429 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		0EC5C65A2ECA41120017896E /* DiskUtilityHelper.xpc */ = {isa = PBXFileReference; explicitFileType = "wrapper.xpc-service"; includeInIndex = 0; path = DiskUtilityHelper.xpc; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -20,6 +46,20 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Resources/Info.plist,
+			);
+			target = 0E860AF12E27F0C9003B18B4 /* VMManager */;
+		};
+		0EC5C6692ECA41120017896E /* Exceptions for "DiskUtilityHelper" folder in "DiskUtilityHelper" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0EC5C6592ECA41120017896E /* DiskUtilityHelper */;
+		};
+		0EC5C66C2ECA41A20017896E /* Exceptions for "DiskUtilityHelper" folder in "VMManager" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				DiskUtilityHelperProtocol.swift,
 			);
 			target = 0E860AF12E27F0C9003B18B4 /* VMManager */;
 		};
@@ -34,10 +74,26 @@
 			path = VMManager;
 			sourceTree = "<group>";
 		};
+		0EC5C65B2ECA41120017896E /* DiskUtilityHelper */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0EC5C66C2ECA41A20017896E /* Exceptions for "DiskUtilityHelper" folder in "VMManager" target */,
+				0EC5C6692ECA41120017896E /* Exceptions for "DiskUtilityHelper" folder in "DiskUtilityHelper" target */,
+			);
+			path = DiskUtilityHelper;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		0E860AEF2E27F0C9003B18B4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0EC5C6572ECA41120017896E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -51,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				0E860AF42E27F0C9003B18B4 /* VMManager */,
+				0EC5C65B2ECA41120017896E /* DiskUtilityHelper */,
 				0E860AF32E27F0C9003B18B4 /* Products */,
 				0EC2886C2EC792FD007B9429 /* README.md */,
 			);
@@ -60,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				0E860AF22E27F0C9003B18B4 /* VMManager.app */,
+				0EC5C65A2ECA41120017896E /* DiskUtilityHelper.xpc */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -74,10 +132,12 @@
 				0E860AEE2E27F0C9003B18B4 /* Sources */,
 				0E860AEF2E27F0C9003B18B4 /* Frameworks */,
 				0E860AF02E27F0C9003B18B4 /* Resources */,
+				0EC5C66A2ECA41120017896E /* Embed XPC Services */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				0EC5C6642ECA41120017896E /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				0E860AF42E27F0C9003B18B4 /* VMManager */,
@@ -89,6 +149,28 @@
 			productReference = 0E860AF22E27F0C9003B18B4 /* VMManager.app */;
 			productType = "com.apple.product-type.application";
 		};
+		0EC5C6592ECA41120017896E /* DiskUtilityHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0EC5C6662ECA41120017896E /* Build configuration list for PBXNativeTarget "DiskUtilityHelper" */;
+			buildPhases = (
+				0EC5C6562ECA41120017896E /* Sources */,
+				0EC5C6572ECA41120017896E /* Frameworks */,
+				0EC5C6582ECA41120017896E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0EC5C65B2ECA41120017896E /* DiskUtilityHelper */,
+			);
+			name = DiskUtilityHelper;
+			packageProductDependencies = (
+			);
+			productName = DiskUtilityHelper;
+			productReference = 0EC5C65A2ECA41120017896E /* DiskUtilityHelper.xpc */;
+			productType = "com.apple.product-type.xpc-service";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -96,11 +178,14 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2600;
+				LastSwiftUpdateCheck = 2610;
 				LastUpgradeCheck = 2610;
 				TargetAttributes = {
 					0E860AF12E27F0C9003B18B4 = {
 						CreatedOnToolsVersion = 26.0;
+					};
+					0EC5C6592ECA41120017896E = {
+						CreatedOnToolsVersion = 26.1.1;
 					};
 				};
 			};
@@ -119,6 +204,7 @@
 			projectRoot = "";
 			targets = (
 				0E860AF12E27F0C9003B18B4 /* VMManager */,
+				0EC5C6592ECA41120017896E /* DiskUtilityHelper */,
 			);
 		};
 /* End PBXProject section */
@@ -132,6 +218,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0EC5C6582ECA41120017896E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -142,7 +235,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0EC5C6562ECA41120017896E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0EC5C6642ECA41120017896E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0EC5C6592ECA41120017896E /* DiskUtilityHelper */;
+			targetProxy = 0EC5C6632ECA41120017896E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		0E860AFB2E27F0CA003B18B4 /* Debug */ = {
@@ -379,6 +487,62 @@
 			};
 			name = Release;
 		};
+		0EC5C6672ECA41120017896E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DiskUtilityHelper/DiskUtilityHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HFR8F4BT7E;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DiskUtilityHelper/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DiskUtilityHelper;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mazjap.VMManager.DiskUtilityHelper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		0EC5C6682ECA41120017896E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DiskUtilityHelper/DiskUtilityHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HFR8F4BT7E;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DiskUtilityHelper/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DiskUtilityHelper;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mazjap.VMManager.DiskUtilityHelper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -396,6 +560,15 @@
 			buildConfigurations = (
 				0E860AFE2E27F0CA003B18B4 /* Debug */,
 				0E860AFF2E27F0CA003B18B4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0EC5C6662ECA41120017896E /* Build configuration list for PBXNativeTarget "DiskUtilityHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0EC5C6672ECA41120017896E /* Debug */,
+				0EC5C6682ECA41120017896E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
