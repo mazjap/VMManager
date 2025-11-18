@@ -7,6 +7,7 @@ struct EditLaunchOptionsView: View {
     @Environment(\.modelContext) private var modelContext
     
     private let instance: VMInstance
+    private let diskUtilClient = DiskUtilityClient()
     @State private var launchOptions: LaunchOptions
     @State private var spaceAvailableInGb: UInt
     
@@ -97,7 +98,9 @@ struct EditLaunchOptionsView: View {
             Spacer()
             
             Button {
-                saveChanges()
+                Task {
+                    await saveChanges()
+                }
             } label: {
                 HStack {
                     Text("Save")
@@ -112,7 +115,7 @@ struct EditLaunchOptionsView: View {
         .background(Color(nsColor: .controlBackgroundColor))
     }
     
-    private func saveChanges() {
+    private func saveChanges() async {
         let binaryCoder = BinaryMetadataCoder()
         let data = binaryCoder.encode(launchOptions)
         
@@ -124,6 +127,11 @@ struct EditLaunchOptionsView: View {
         }
         
         do {
+            for try await progress in diskUtilClient.resizeDiskImage(at: instance.bundlePath.diskImageURL, toSizeInGiB: launchOptions.storageGb) {
+                print("Progress: \(progress)%")
+                // TODO: - Add UI that alerts user to progress
+            }
+            
             try data.write(to: instance.bundlePath.metaDataURL)
             print("✅ Successfully saved launch options: \(launchOptions)")
             // TODO: - Change size of filesystem using diskutil (see `man diskutil` in terminal for more info, specifically, `diskutil image resize -s <sizeInGb>GiB <urlOfImage>`)
