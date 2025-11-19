@@ -8,11 +8,7 @@ enum SaveProgress: Equatable {
 }
 
 struct EditLaunchOptionsView: View {
-    @Environment(\.dismissWindow) private var dismissWindow
-    @Environment(\.modelContext) private var modelContext
-    
     private let instance: VMInstance
-    private let diskUtilClient = DiskUtilityClient()
     private let initialLaunchOptions: LaunchOptions
     @State private var launchOptions: LaunchOptions
     @State private var spaceAvailableInGb: UInt
@@ -33,6 +29,7 @@ struct EditLaunchOptionsView: View {
         // TODO: - Determine if State(initialValue:) in initializer is still bad practice
         
         do {
+            // TODO: - Fix this blocking the main thread
             let data = try Data(contentsOf: instance.bundlePath.metaDataURL)
             let binaryCoder = BinaryMetadataCoder()
             let initialLaunchOptions = try binaryCoder.decodeLaunchOptions(from: data)
@@ -55,25 +52,57 @@ struct EditLaunchOptionsView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            
-            Divider()
-            
-            ResourcesStep(
-                launchOptions: $launchOptions,
-                spaceAvailableInGb: spaceAvailableInGb
-            )
-            
-            Divider()
-            
-            footer
+        _EditLaunchOptionsView(bundlePath: instance.bundlePath, displayName: instance.name, initialLaunchOptions: initialLaunchOptions, launchOptions: $launchOptions, spaceAvailableInGb: $spaceAvailableInGb, saveError: $saveError, isSaving: $isSaving, saveProgress: $saveProgress)
+    }
+}
+
+fileprivate struct _EditLaunchOptionsView: View {
+    @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.modelContext) private var modelContext
+    
+    private let bundlePath: VmBundlePath
+    private let displayName: String
+    private let diskUtilClient = DiskUtilityClient()
+    private let initialLaunchOptions: LaunchOptions
+    @Binding private var launchOptions: LaunchOptions
+    @Binding private var spaceAvailableInGb: UInt
+    @Binding private var saveError: Error?
+    @Binding private var isSaving: Bool
+    @Binding private var saveProgress: SaveProgress?
+    
+    init(bundlePath: VmBundlePath, displayName: String, initialLaunchOptions: LaunchOptions, launchOptions: Binding<LaunchOptions>, spaceAvailableInGb: Binding<UInt>, saveError: Binding<Error?>, isSaving: Binding<Bool>, saveProgress: Binding<SaveProgress?>) {
+        self.bundlePath = bundlePath
+        self.displayName = displayName
+        self.initialLaunchOptions = initialLaunchOptions
+        self._launchOptions = launchOptions
+        self._spaceAvailableInGb = spaceAvailableInGb
+        self._saveError = saveError
+        self._isSaving = isSaving
+        self._saveProgress = saveProgress
+    }
+    
+    var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                header
+                
+                Divider()
+                
+                ResourcesStep(
+                    launchOptions: $launchOptions,
+                    spaceAvailableInGb: spaceAvailableInGb
+                )
+                
+                Divider()
+                
+                footer
+            }
         }
         .sheet(isPresented: $isSaving) {
             if let saveProgress {
                 savingProgressSheet(progress: saveProgress)
             } else {
-                EmptyView()
+                Color.clear
                     .onAppear {
                         isSaving = false
                     }
@@ -91,6 +120,9 @@ struct EditLaunchOptionsView: View {
                 Text(error.localizedDescription)
             }
         }
+        .onChange(of: isSaving) {
+            print(isSaving)
+        }
     }
     
     private var header: some View {
@@ -105,7 +137,7 @@ struct EditLaunchOptionsView: View {
                         .font(.title2)
                         .fontWeight(.semibold)
                     
-                    Text(instance.name)
+                    Text(displayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -208,25 +240,25 @@ struct EditLaunchOptionsView: View {
     }
     
     private func saveChanges() async {
-        saveProgress = .resizeDiskImage(0)
+        saveProgress = .saveMetadata
         saveError = nil
         isSaving = true
         
         let binaryCoder = BinaryMetadataCoder()
         let data = binaryCoder.encode(launchOptions)
         
-        let successfullyAuthorized = instance.bundlePath.url.startAccessingSecurityScopedResource()
+        let successfullyAuthorized = bundlePath.url.startAccessingSecurityScopedResource()
         defer {
             if successfullyAuthorized {
-                instance.bundlePath.url.stopAccessingSecurityScopedResource()
+                bundlePath.url.stopAccessingSecurityScopedResource()
             }
         }
         
         do {
             let currentLaunchOptions = launchOptions
-            
             if initialLaunchOptions.storageGb != currentLaunchOptions.storageGb {
-                for try await percentage in diskUtilClient.resizeDiskImage(at: instance.bundlePath.diskImageURL, toSizeInGiB: launchOptions.storageGb) {
+                saveProgress = .resizeDiskImage(0)
+                for try await percentage in diskUtilClient.resizeDiskImage(at: bundlePath.diskImageURL, toSizeInGiB: launchOptions.storageGb) {
                     print("Progress: \(percentage)%")
                     saveProgress = .resizeDiskImage(percentage)
                 }
@@ -234,7 +266,7 @@ struct EditLaunchOptionsView: View {
             
             saveProgress = .saveMetadata
             
-            let metaDataURL = instance.bundlePath.metaDataURL
+            let metaDataURL = bundlePath.metaDataURL
             
             try await Task.detached(name: "Save Launch Option changes", priority: .userInitiated) {
                 if initialLaunchOptions != currentLaunchOptions {
@@ -244,15 +276,26 @@ struct EditLaunchOptionsView: View {
                     print("Launch options were unchanged")
                 }
             }.value
+            
+            isSaving = false
+            
+            try? await Task.sleep(for: .seconds(0.1))
+            
+            dismissWindow()
         } catch {
             print("Failed to save launch options: \(error)")
             saveError = error
+            isSaving = false
         }
-        
-        isSaving = false
-        
-        try? await Task.sleep(for: .seconds(0.1))
-        
-        dismissWindow()
     }
+}
+
+#Preview {
+    @Previewable @State var launchOptions = LaunchOptions(cpuCores: 2, memoryGb: 16, storageGb: 64)
+    @Previewable @State var spaceAvailableInGb: UInt = 100
+    @Previewable @State var saveError: Error?
+    @Previewable @State var isSaving = false
+    @Previewable @State var saveProgress: SaveProgress? = nil
+    
+    _EditLaunchOptionsView(bundlePath: .default, displayName: "VM", initialLaunchOptions: LaunchOptions(cpuCores: 1, memoryGb: 16, storageGb: 64), launchOptions: $launchOptions, spaceAvailableInGb: $spaceAvailableInGb, saveError: $saveError, isSaving: $isSaving, saveProgress: $saveProgress)
 }
