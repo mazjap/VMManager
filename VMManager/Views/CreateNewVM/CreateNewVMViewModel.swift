@@ -240,7 +240,7 @@ class CreateNewVMViewModel {
         progress = .installFraction(0)
         
         do {
-            let restoreImage = try await getRestoreImageFrom(ipswURL: paths.restoreImageURL)
+            let restoreImage = try await VZMacOSRestoreImage.load(from: paths.restoreImageURL)
             
             guard let macOSConfiguration = restoreImage.mostFeaturefulSupportedConfiguration else {
                 fatalError("No supported configuration available.")
@@ -263,27 +263,7 @@ class CreateNewVMViewModel {
             throw error as! NewVMError
         }
     }
-
-    // TODO: Refactor into extension on VZMacOSRestoreImage
-    private func getRestoreImageFrom(ipswURL: URL) async throws(NewVMError) -> VZMacOSRestoreImage {
-        do {
-            return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<VZMacOSRestoreImage, Error>) in
-                VZMacOSRestoreImage.load(from: ipswURL, completionHandler: { result in
-                    switch result {
-                    case let .failure(error):
-                        continuation.resume(throwing: NewVMError.whileLoadingIpswFile(at: ipswURL, error))
-                        return
-                    case let .success(restoreImage):
-                        continuation.resume(returning: restoreImage)
-                        return
-                    }
-                })
-            }
-        } catch {
-            throw (error as! NewVMError)
-        }
-    }
-
+    
     private func createMacPlatformConfiguration(macOSConfiguration: VZMacOSConfigurationRequirements, paths: VmBundlePath) -> VZMacPlatformConfiguration {
         let macPlatformConfiguration = VZMacPlatformConfiguration()
 
