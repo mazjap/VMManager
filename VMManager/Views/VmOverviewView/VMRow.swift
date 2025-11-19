@@ -102,7 +102,7 @@ struct VMRow: View {
     }
     
     private var metadata: some View {
-        HStack(spacing: 12) { // TODO: - Store metadata in bundle so that if you create a new VMInstance from an existing bundle or relink, you have all the metadata
+        HStack(spacing: 12) {
             Label {
                 Text(instance.bundlePath.url.standardizedFileURL.path(percentEncoded: false))
                     .lineLimit(1)

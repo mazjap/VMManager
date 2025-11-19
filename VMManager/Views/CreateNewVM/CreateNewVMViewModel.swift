@@ -294,12 +294,11 @@ class CreateNewVMViewModel {
         ) else {
             fatalError("Failed to create auxiliary storage.")
         }
+        
         macPlatformConfiguration.auxiliaryStorage = auxiliaryStorage
         macPlatformConfiguration.hardwareModel = macOSConfiguration.hardwareModel
         macPlatformConfiguration.machineIdentifier = VZMacMachineIdentifier()
-
-        // Store the hardware model and machine identifier to disk so that the app
-        // can retrieve them for subsequent boots.
+        
         try! macPlatformConfiguration.hardwareModel.dataRepresentation.write(to: paths.hardwareModelURL)
         try! macPlatformConfiguration.machineIdentifier.dataRepresentation.write(to: paths.machineIdentifierURL)
 

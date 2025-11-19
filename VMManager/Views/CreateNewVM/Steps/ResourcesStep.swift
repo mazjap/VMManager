@@ -58,7 +58,7 @@ struct ResourcesStep: View {
                         icon: "internaldrive",
                         title: "Disk Size",
                         value: $launchOptions.storageGb,
-                        range: 32...spaceAvailableInGb, // TODO: - Make max disk space conform to how much space is available after checking the path provided.
+                        range: 32...spaceAvailableInGb,
                         color: .green,
                         formatter: { "\($0) GB" }
                     )
