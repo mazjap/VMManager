@@ -4,7 +4,6 @@ import SwiftData
 // Get rid of fatalErrors and swap them with runtime user-interactive errors (graceful failure) (also fix try?s and try!s)
 // Handle relevant TODOs
 // Seperation of concerns/better project structure
-// Resize disk image
 
 @main
 struct VMManagerApp: App {
