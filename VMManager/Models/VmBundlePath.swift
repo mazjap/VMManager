@@ -55,3 +55,29 @@ struct VmBundlePath: Codable, Hashable, Sendable {
     static let `default` = VmBundlePath(containerURL: FileManager.default.homeDirectoryForCurrentUser, bundleName: "VM")
     private static let `extension` = "bundle"
 }
+
+enum BundleComponent: String, CaseIterable {
+    case bundle = "Bundle Directory"
+    case diskImage = "Disk Image"
+    case auxiliaryStorage = "Auxiliary Storage"
+    case hardwareModel = "Hardware Model"
+    case machineIdentifier = "Machine Identifier"
+    case metadata = "Metadata"
+    
+    func path(in bundlePath: VmBundlePath) -> URL {
+        switch self {
+        case .bundle:
+            return bundlePath.url
+        case .diskImage:
+            return bundlePath.diskImageURL
+        case .auxiliaryStorage:
+            return bundlePath.auxiliaryStorageURL
+        case .hardwareModel:
+            return bundlePath.hardwareModelURL
+        case .machineIdentifier:
+            return bundlePath.machineIdentifierURL
+        case .metadata:
+            return bundlePath.metaDataURL
+        }
+    }
+}

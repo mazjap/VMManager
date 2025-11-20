@@ -23,7 +23,7 @@ struct BinaryMetadataCoder {
         return Data(data)
     }
     
-    func decodeLaunchOptions(from data: Data) throws -> LaunchOptions {
+    func decodeLaunchOptions(from data: Data) -> LaunchOptions {
         guard data.count >= 27,
               data[0] == 0,
               data[9] == 1,

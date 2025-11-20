@@ -198,7 +198,7 @@ struct CreateNewVMView: View {
     // MARK: - Installation Progress Sheet
     
     @ViewBuilder
-    private func installationProgressSheet(progress: NewVMProgress) -> some View {
+    private func installationProgressSheet(progress: VMCreationProgress) -> some View {
         VStack(spacing: 20) {
             ZStack {
                 Circle()
@@ -222,7 +222,13 @@ struct CreateNewVMView: View {
             }
             
             switch progress {
-            case let .downloadFraction(fraction):
+            case .validating:
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                        .frame(width: 300)
+                }
+            case let .downloadingRestoreImage(fraction):
                 VStack(spacing: 12) {
                     ProgressView(value: fraction, total: 1.0)
                         .progressViewStyle(.linear)
@@ -241,19 +247,19 @@ struct CreateNewVMView: View {
                     }
                     .frame(width: 300)
                 }
-            case .copyingRestoreFile:
+            case .copyingRestoreImage:
                 VStack(spacing: 12) {
                     ProgressView()
                         .progressViewStyle(.linear)
                         .frame(width: 300)
                 }
-            case .creatingAuxFiles:
+            case .creatingAuxiliaryFiles, .creatingBundle:
                 VStack(spacing: 12) {
                     ProgressView()
                         .progressViewStyle(.linear)
                         .frame(width: 300)
                 }
-            case let .installFraction(fraction):
+            case let .installingMacOS(fraction):
                 VStack(spacing: 12) {
                     ProgressView(value: fraction, total: 1.0)
                         .progressViewStyle(.linear)
@@ -263,7 +269,7 @@ struct CreateNewVMView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            case .cleanup:
+            case .cleaningUp:
                 VStack(spacing: 12) {
                     ProgressView()
                         .progressViewStyle(.linear)
@@ -294,7 +300,7 @@ struct CreateNewVMView: View {
         }
         .padding(40)
         .frame(width: 450)
-        .interactiveDismissDisabled(progress != .complete)
+        .interactiveDismissDisabled(model.isDownloading())
     }
     
     // MARK: - Helper Methods
@@ -335,35 +341,38 @@ struct CreateNewVMView: View {
         }
     }
     
-    private func iconForProgress(_ progress: NewVMProgress) -> String {
+    private func iconForProgress(_ progress: VMCreationProgress) -> String {
         switch progress {
-        case .downloadFraction: "arrow.down.circle.fill"
-        case .copyingRestoreFile: "document.on.document.fill"
-        case .creatingAuxFiles: "plus.circle.fill"
-        case .installFraction: "gearshape.2.fill"
-        case .cleanup: "trash.circle.fill"
+        case .validating: "magnifyingglass.circle.fill"
+        case .downloadingRestoreImage: "arrow.down.circle.fill"
+        case .copyingRestoreImage: "document.on.document.fill"
+        case .creatingBundle, .creatingAuxiliaryFiles: "plus.circle.fill"
+        case .installingMacOS: "gearshape.2.fill"
+        case .cleaningUp: "trash.circle.fill"
         case .complete: "checkmark.circle.fill"
         }
     }
     
-    private func titleForProgress(_ progress: NewVMProgress) -> String {
+    private func titleForProgress(_ progress: VMCreationProgress) -> String {
         switch progress {
-        case .downloadFraction: "Downloading macOS"
-        case .creatingAuxFiles: "Creating Auxiliary Files"
-        case .copyingRestoreFile: "Copying Restore File"
-        case .installFraction: "Installing Virtual Machine"
-        case .cleanup: "Cleaning Up"
+        case .validating: "Validating"
+        case .downloadingRestoreImage: "Downloading macOS"
+        case .copyingRestoreImage: "Copying Restore File"
+        case .creatingBundle, .creatingAuxiliaryFiles: "Creating Auxiliary Files"
+        case .installingMacOS: "Installing Virtual Machine"
+        case .cleaningUp: "Cleaning Up"
         case .complete: "Installation Complete"
         }
     }
     
-    private func descriptionForProgress(_ progress: NewVMProgress) -> String {
+    private func descriptionForProgress(_ progress: VMCreationProgress) -> String {
         switch progress {
-        case .downloadFraction: "Downloading the latest macOS restore image from Apple"
-        case .copyingRestoreFile: "Copying the selected restore file to the location of your virtual machine"
-        case .creatingAuxFiles: "Creating necessary files for the installation process"
-        case .installFraction: "Installing macOS to the virtual machine disk"
-        case .cleanup: "Cleaning up temporary files"
+        case .validating: "Validating your selected options"
+        case .downloadingRestoreImage: "Downloading the latest macOS restore image from Apple"
+        case .copyingRestoreImage: "Copying the selected restore file to the location of your virtual machine"
+        case .creatingBundle, .creatingAuxiliaryFiles: "Creating necessary files for the installation process"
+        case .installingMacOS: "Installing macOS to the virtual machine disk"
+        case .cleaningUp: "Cleaning up temporary files"
         case .complete: "Your virtual machine has been created successfully"
         }
     }

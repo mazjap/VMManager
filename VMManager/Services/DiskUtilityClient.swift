@@ -1,5 +1,14 @@
 import Foundation
 
+enum DiskUtilityError: Error {
+    static let domain = DiskUtilityErrorDomain
+    
+    case noXPCConnectionAvailable
+    case failedToConnectToXPCService
+    case resizeError(Error)
+    case createError(Error)
+}
+
 class DiskUtilityClient {
     private var connection: NSXPCConnection?
     
@@ -25,36 +34,32 @@ class DiskUtilityClient {
         self.connection = connection
     }
     
-    func createDiskImage(at path: URL, sizeInGiB: UInt) async throws {
+    func createDiskImage(at path: URL, sizeInGiB: UInt) async throws(DiskUtilityError) {
         guard let connection = connection else {
-            throw NSError(
-                domain: DiskUtilityErrorDomain,
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "No XPC connection available"]
-            )
+            throw DiskUtilityError.noXPCConnectionAvailable
         }
         
         guard let service = connection.remoteObjectProxyWithErrorHandler({ error in
             assertionFailure("XPC Error: \(error)")
         }) as? DiskUtilityHelperProtocol else {
-            throw NSError(
-                domain: DiskUtilityErrorDomain,
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Failed to connect to helper service"]
-            )
+            throw DiskUtilityError.failedToConnectToXPCService
         }
         
-        return try await withCheckedThrowingContinuation { continuation in
-            service.createDiskImage(
-                at: path.path(percentEncoded: false),
-                sizeInGiB: sizeInGiB
-            ) { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
+        do {
+            return try await withCheckedThrowingContinuation { continuation in
+                service.createDiskImage(
+                    at: path.path(percentEncoded: false),
+                    sizeInGiB: sizeInGiB
+                ) { error in
+                    if let error {
+                        continuation.resume(throwing: DiskUtilityError.createError(error))
+                    } else {
+                        continuation.resume()
+                    }
                 }
             }
+        } catch {
+            throw error as! DiskUtilityError
         }
     }
     
@@ -64,11 +69,7 @@ class DiskUtilityClient {
     ) -> AsyncThrowingStream<Int, Error> {
         guard let connection = connection else {
             return AsyncThrowingStream { continuation in
-                continuation.finish(throwing: NSError(
-                    domain: DiskUtilityErrorDomain,
-                    code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "No XPC connection available"]
-                ))
+                continuation.finish(throwing: DiskUtilityError.noXPCConnectionAvailable)
             }
         }
         
@@ -76,11 +77,7 @@ class DiskUtilityClient {
             guard let service = connection.remoteObjectProxyWithErrorHandler({ error in
                 assertionFailure("XPC Error: \(error)")
             }) as? DiskUtilityHelperProtocol else {
-                continuation.finish(throwing: NSError(
-                    domain: DiskUtilityErrorDomain,
-                    code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to connect to helper service"]
-                ))
+                continuation.finish(throwing: DiskUtilityError.failedToConnectToXPCService)
                 return
             }
             
@@ -96,7 +93,7 @@ class DiskUtilityClient {
                 toSizeInGiB: newSize
             ) { error in
                 if let error {
-                    continuation.finish(throwing: error)
+                    continuation.finish(throwing: DiskUtilityError.resizeError(error))
                 } else {
                     continuation.finish()
                 }
