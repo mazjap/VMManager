@@ -32,7 +32,7 @@ struct EditLaunchOptionsView: View {
             // TODO: - Fix this blocking the main thread
             let data = try Data(contentsOf: instance.bundlePath.metaDataURL)
             let binaryCoder = BinaryMetadataCoder()
-            let initialLaunchOptions = try binaryCoder.decodeLaunchOptions(from: data)
+            let initialLaunchOptions = binaryCoder.decodeLaunchOptions(from: data)
             self.initialLaunchOptions = initialLaunchOptions
             self._launchOptions = State(initialValue: initialLaunchOptions)
         } catch {
