@@ -8,51 +8,15 @@ enum SaveProgress: Equatable {
 }
 
 struct EditLaunchOptionsView: View {
-    private let instance: VMInstance
-    private let initialLaunchOptions: LaunchOptions
-    @State private var launchOptions: LaunchOptions
-    @State private var spaceAvailableInGb: UInt
-    @State private var saveError: Error?
-    @State private var isSaving = false
-    @State private var saveProgress: SaveProgress?
+    @State private var model: EditLaunchOptionsViewModel
     
     init(instance: VMInstance) {
-        self.instance = instance
-        
-        let accessGranted = instance.bundlePath.url.startAccessingSecurityScopedResource()
-        defer {
-            if accessGranted {
-                instance.bundlePath.url.stopAccessingSecurityScopedResource()
-            }
-        }
-        
         // TODO: - Determine if State(initialValue:) in initializer is still bad practice
-        
-        do {
-            // TODO: - Fix this blocking the main thread
-            let data = try Data(contentsOf: instance.bundlePath.metaDataURL)
-            let binaryCoder = BinaryMetadataCoder()
-            let initialLaunchOptions = binaryCoder.decodeLaunchOptions(from: data)
-            self.initialLaunchOptions = initialLaunchOptions
-            self._launchOptions = State(initialValue: initialLaunchOptions)
-        } catch {
-            print("unable to load launch options from \(instance.bundlePath.metaDataURL): \(error)")
-            self.initialLaunchOptions = VMConfigHelper.defaultLaunchOptions
-            self._launchOptions = State(initialValue: VMConfigHelper.defaultLaunchOptions)
-        }
-        if let data = FileManager.default.contents(atPath: instance.bundlePath.metaDataURL.path(percentEncoded: false)) {
-            let binaryCoder = BinaryMetadataCoder()
-            self._launchOptions = State(initialValue: (try? binaryCoder.decodeLaunchOptions(from: data)) ?? VMConfigHelper.defaultLaunchOptions)
-        } else {
-            self._launchOptions = State(initialValue: VMConfigHelper.defaultLaunchOptions)
-        }
-        
-        let available = (try? instance.bundlePath.url.getStorage().available) ?? (128 * 1024 * 1024 * 1024)
-        self._spaceAvailableInGb = State(initialValue: UInt(available / (1024 * 1024 * 1024)))
+        self._model = State(initialValue: EditLaunchOptionsViewModel(instance: instance))
     }
     
     var body: some View {
-        _EditLaunchOptionsView(bundlePath: instance.bundlePath, displayName: instance.name, initialLaunchOptions: initialLaunchOptions, launchOptions: $launchOptions, spaceAvailableInGb: $spaceAvailableInGb, saveError: $saveError, isSaving: $isSaving, saveProgress: $saveProgress)
+        _EditLaunchOptionsView(model: model)
     }
 }
 
@@ -60,28 +24,15 @@ fileprivate struct _EditLaunchOptionsView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.modelContext) private var modelContext
     
-    private let bundlePath: VmBundlePath
-    private let displayName: String
-    private let diskUtilClient = DiskUtilityClient()
-    private let initialLaunchOptions: LaunchOptions
-    @Binding private var launchOptions: LaunchOptions
-    @Binding private var spaceAvailableInGb: UInt
-    @Binding private var saveError: Error?
-    @Binding private var isSaving: Bool
-    @Binding private var saveProgress: SaveProgress?
+    private let model: EditLaunchOptionsViewModel
     
-    init(bundlePath: VmBundlePath, displayName: String, initialLaunchOptions: LaunchOptions, launchOptions: Binding<LaunchOptions>, spaceAvailableInGb: Binding<UInt>, saveError: Binding<Error?>, isSaving: Binding<Bool>, saveProgress: Binding<SaveProgress?>) {
-        self.bundlePath = bundlePath
-        self.displayName = displayName
-        self.initialLaunchOptions = initialLaunchOptions
-        self._launchOptions = launchOptions
-        self._spaceAvailableInGb = spaceAvailableInGb
-        self._saveError = saveError
-        self._isSaving = isSaving
-        self._saveProgress = saveProgress
+    init(model: EditLaunchOptionsViewModel) {
+        self.model = model
     }
     
     var body: some View {
+        let bindable = Bindable(model)
+        
         ZStack {
             VStack(spacing: 0) {
                 header
@@ -89,8 +40,8 @@ fileprivate struct _EditLaunchOptionsView: View {
                 Divider()
                 
                 ResourcesStep(
-                    launchOptions: $launchOptions,
-                    spaceAvailableInGb: spaceAvailableInGb
+                    launchOptions: bindable.launchOptions,
+                    spaceAvailableInGb: model.spaceAvailableInGb
                 )
                 
                 Divider()
@@ -98,30 +49,30 @@ fileprivate struct _EditLaunchOptionsView: View {
                 footer
             }
         }
-        .sheet(isPresented: $isSaving) {
-            if let saveProgress {
+        .sheet(isPresented: bindable.isSaving) {
+            if let saveProgress = model.saveProgress {
                 savingProgressSheet(progress: saveProgress)
             } else {
                 Color.clear
                     .onAppear {
-                        isSaving = false
+                        model.isSaving = false
                     }
             }
         }
         .alert("Save Failed", isPresented: Binding(
-            get: { saveError != nil },
-            set: { if !$0 { saveError = nil } }
+            get: { model.saveError != nil },
+            set: { if !$0 { model.saveError = nil } }
         )) {
             Button("OK") {
-                saveError = nil
+                model.saveError = nil
             }
         } message: {
-            if let error = saveError {
+            if let error = model.saveError {
                 Text(error.localizedDescription)
             }
         }
-        .onChange(of: isSaving) {
-            print(isSaving)
+        .onChange(of: model.isSaving) {
+            print(model.isSaving)
         }
     }
     
@@ -137,7 +88,7 @@ fileprivate struct _EditLaunchOptionsView: View {
                         .font(.title2)
                         .fontWeight(.semibold)
                     
-                    Text(displayName)
+                    Text(model.displayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -165,7 +116,11 @@ fileprivate struct _EditLaunchOptionsView: View {
             
             Button {
                 Task {
-                    await saveChanges()
+                    if await model.saveChanges() {
+                        try? await Task.sleep(for: .seconds(0.1))
+                        
+                        dismissWindow()
+                    }
                 }
             } label: {
                 HStack {
@@ -238,64 +193,10 @@ fileprivate struct _EditLaunchOptionsView: View {
         .frame(width: 450)
         .interactiveDismissDisabled()
     }
-    
-    private func saveChanges() async {
-        saveProgress = .saveMetadata
-        saveError = nil
-        isSaving = true
-        
-        let binaryCoder = BinaryMetadataCoder()
-        let data = binaryCoder.encode(launchOptions)
-        
-        let successfullyAuthorized = bundlePath.url.startAccessingSecurityScopedResource()
-        defer {
-            if successfullyAuthorized {
-                bundlePath.url.stopAccessingSecurityScopedResource()
-            }
-        }
-        
-        do {
-            let currentLaunchOptions = launchOptions
-            if initialLaunchOptions.storageGb != currentLaunchOptions.storageGb {
-                saveProgress = .resizeDiskImage(0)
-                for try await percentage in diskUtilClient.resizeDiskImage(at: bundlePath.diskImageURL, toSizeInGiB: launchOptions.storageGb) {
-                    print("Progress: \(percentage)%")
-                    saveProgress = .resizeDiskImage(percentage)
-                }
-            }
-            
-            saveProgress = .saveMetadata
-            
-            let metaDataURL = bundlePath.metaDataURL
-            
-            try await Task.detached(name: "Save Launch Option changes", priority: .userInitiated) {
-                if initialLaunchOptions != currentLaunchOptions {
-                    try data.write(to: metaDataURL)
-                    print("Successfully saved launch options: \(currentLaunchOptions)")
-                } else {
-                    print("Launch options were unchanged")
-                }
-            }.value
-            
-            isSaving = false
-            
-            try? await Task.sleep(for: .seconds(0.1))
-            
-            dismissWindow()
-        } catch {
-            print("Failed to save launch options: \(error)")
-            saveError = error
-            isSaving = false
-        }
-    }
 }
 
 #Preview {
-    @Previewable @State var launchOptions = LaunchOptions(cpuCores: 2, memoryGb: 16, storageGb: 64)
-    @Previewable @State var spaceAvailableInGb: UInt = 100
-    @Previewable @State var saveError: Error?
-    @Previewable @State var isSaving = false
-    @Previewable @State var saveProgress: SaveProgress? = nil
+    @Previewable @State var model = EditLaunchOptionsViewModel(diskUtilClient: DiskUtilityClient(), bundlePath: VmBundlePath(containerURL: URL(filePath: "/Users/jman"), bundleName: "vm"), displayName: "VM", initialLaunchOptions: LaunchOptions(cpuCores: 2, memoryGb: 16, storageGb: 64), spaceAvailableInGb: 100)
     
-    _EditLaunchOptionsView(bundlePath: .default, displayName: "VM", initialLaunchOptions: LaunchOptions(cpuCores: 1, memoryGb: 16, storageGb: 64), launchOptions: $launchOptions, spaceAvailableInGb: $spaceAvailableInGb, saveError: $saveError, isSaving: $isSaving, saveProgress: $saveProgress)
+    _EditLaunchOptionsView(model: model)
 }

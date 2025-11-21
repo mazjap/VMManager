@@ -276,7 +276,7 @@ class VMFileSystemService {
     private func createAuxiliaryStorage(at url: URL, with hardwareModel: VZMacHardwareModel) throws(VMFileSystemError) {
         do {
             
-            let auxiliaryStorage = try VZMacAuxiliaryStorage(
+            let _ = try VZMacAuxiliaryStorage(
                 creatingStorageAt: url,
                 hardwareModel: hardwareModel,
                 options: []
