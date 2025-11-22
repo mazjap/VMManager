@@ -2,11 +2,6 @@ import SwiftUI
 import SwiftData
 import Virtualization
 
-enum SaveProgress: Equatable {
-    case resizeDiskImage(Int)
-    case saveMetadata
-}
-
 struct EditLaunchOptionsView: View {
     @State private var model: EditLaunchOptionsViewModel
     
@@ -136,14 +131,19 @@ fileprivate struct _EditLaunchOptionsView: View {
         .background(Color(nsColor: .controlBackgroundColor))
     }
     
-    private func savingProgressSheet(progress: SaveProgress) -> some View {
+    private func savingProgressSheet(progress: VMResourceUpdateProgress) -> some View {
         VStack(spacing: 24) {
             ZStack {
                 Circle()
                     .fill(Color.accentColor.opacity(0.15))
                     .frame(width: 80, height: 80)
                 
-                if case let .resizeDiskImage(percentage) = progress {
+                switch progress {
+                case .validating:
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .scaleEffect(1.5)
+                case let .resizingDisk(percentage):
                     ZStack {
                         Circle()
                             .stroke(Color.accentColor.opacity(0.3), lineWidth: 8)
@@ -156,15 +156,36 @@ fileprivate struct _EditLaunchOptionsView: View {
                             .rotationEffect(.degrees(-90))
                             .animation(.linear(duration: 0.3), value: percentage)
                     }
-                } else {
+                case .updatingMetadata:
                     ProgressView()
                         .progressViewStyle(.circular)
                         .scaleEffect(1.5)
+                case .complete:
+                    ZStack {
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.3))
+                            .frame(width: 64, height: 64)
+                        
+                        Image(systemName: "checkmark.circle.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 58, height: 58)
+                            .foregroundStyle(Color.accentColor)
+                    }
                 }
             }
             
             VStack(spacing: 8) {
-                if case let .resizeDiskImage(percentage) = progress {
+                switch progress {
+                case .validating:
+                    Text("Validating")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    
+                    Text("Ensuring bells and whistles are in place...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                case let .resizingDisk(percentage):
                     Text("Resizing Disk Image")
                         .font(.title2)
                         .fontWeight(.semibold)
@@ -172,7 +193,7 @@ fileprivate struct _EditLaunchOptionsView: View {
                     Text("\(percentage)% complete")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                } else {
+                case .updatingMetadata:
                     Text("Saving Changes")
                         .font(.title2)
                         .fontWeight(.semibold)
@@ -180,13 +201,23 @@ fileprivate struct _EditLaunchOptionsView: View {
                     Text("Preparing to save...")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                case .complete:
+                    Text("Complete")
+                        .font(.title2)
+                        .fontWeight(.semibold)
                 }
             }
             
-            if progress == .saveMetadata {
-                ProgressView()
-                    .progressViewStyle(.linear)
-                    .frame(width: 300)
+            if progress == .complete {
+                Button("Done") {
+                    model.isSaving = false
+                    
+                    Task {
+                        try? await Task.sleep(for: .seconds(0.1))
+                        
+                        dismissWindow()
+                    }
+                }
             }
         }
         .padding(40)
@@ -196,7 +227,7 @@ fileprivate struct _EditLaunchOptionsView: View {
 }
 
 #Preview {
-    @Previewable @State var model = EditLaunchOptionsViewModel(diskUtilClient: DiskUtilityClient(), bundlePath: VmBundlePath(containerURL: URL(filePath: "/Users/jman"), bundleName: "vm"), displayName: "VM", initialLaunchOptions: LaunchOptions(cpuCores: 2, memoryGb: 16, storageGb: 64), spaceAvailableInGb: 100)
+    @Previewable @State var model = EditLaunchOptionsViewModel(lifecycleService: VMLifecycleService(), bundlePath: VMBundlePath(containerURL: URL(filePath: "/Users/jman"), bundleName: "vm"), displayName: "VM", initialLaunchOptions: LaunchOptions(cpuCores: 2, memoryGb: 16, storageGb: 64), spaceAvailableInGb: 100)
     
     _EditLaunchOptionsView(model: model)
 }

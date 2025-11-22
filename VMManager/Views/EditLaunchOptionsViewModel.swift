@@ -2,18 +2,18 @@ import Foundation
 
 @Observable
 class EditLaunchOptionsViewModel {
-    private let diskUtilClient: DiskUtilityClient
-    let bundlePath: VmBundlePath
+    private let lifecycleService: VMLifecycleService
+    let bundlePath: VMBundlePath
     let displayName: String
     let initialLaunchOptions: LaunchOptions
     var launchOptions: LaunchOptions
     var spaceAvailableInGb: UInt
     var saveError: Error?
     var isSaving = false
-    var saveProgress: SaveProgress?
+    var saveProgress: VMResourceUpdateProgress?
     
-    init(diskUtilClient: DiskUtilityClient = DiskUtilityClient(), bundlePath: VmBundlePath, displayName: String, initialLaunchOptions: LaunchOptions, spaceAvailableInGb: UInt, saveError: Error? = nil, isSaving: Bool = false, saveProgress: SaveProgress? = nil) {
-        self.diskUtilClient = diskUtilClient
+    init(lifecycleService: VMLifecycleService = VMLifecycleService(), bundlePath: VMBundlePath, displayName: String, initialLaunchOptions: LaunchOptions, spaceAvailableInGb: UInt, saveError: Error? = nil, isSaving: Bool = false, saveProgress: VMResourceUpdateProgress? = nil) {
+        self.lifecycleService = lifecycleService
         self.bundlePath = bundlePath
         self.displayName = displayName
         self.initialLaunchOptions = initialLaunchOptions
@@ -24,7 +24,7 @@ class EditLaunchOptionsViewModel {
         self.saveProgress = saveProgress
     }
     
-    convenience init(instance: VMInstance, diskUtilClient: DiskUtilityClient = DiskUtilityClient()) {
+    convenience init(instance: VMInstance, lifecycleService: VMLifecycleService = VMLifecycleService(), fileSystemService: VMFileSystemService = VMFileSystemService()) {
         let accessGranted = instance.bundlePath.url.startAccessingSecurityScopedResource()
         defer {
             if accessGranted {
@@ -32,18 +32,7 @@ class EditLaunchOptionsViewModel {
             }
         }
         
-        let launchOptions: LaunchOptions
-        
-        do {
-            // TODO: - Fix this blocking the main thread
-            let data = try Data(contentsOf: instance.bundlePath.metaDataURL)
-            let binaryCoder = BinaryMetadataCoder()
-            let initialLaunchOptions = binaryCoder.decodeLaunchOptions(from: data)
-            launchOptions = initialLaunchOptions
-        } catch {
-            print("unable to load launch options from \(instance.bundlePath.metaDataURL): \(error)")
-            launchOptions = VMConfigHelper.defaultLaunchOptions
-        }
+        let launchOptions = fileSystemService.loadLaunchOptions(for: instance.bundlePath)
         
         let available: Int
         
@@ -55,7 +44,7 @@ class EditLaunchOptionsViewModel {
         }
         
         self.init(
-            diskUtilClient: diskUtilClient,
+            lifecycleService: lifecycleService,
             bundlePath: instance.bundlePath,
             displayName: instance.name,
             initialLaunchOptions: launchOptions,
@@ -67,12 +56,9 @@ class EditLaunchOptionsViewModel {
     }
     
     func saveChanges() async -> Bool {
-        saveProgress = .saveMetadata
+        saveProgress = .validating
         saveError = nil
         isSaving = true
-        
-        let binaryCoder = BinaryMetadataCoder()
-        let data = binaryCoder.encode(launchOptions)
         
         let successfullyAuthorized = bundlePath.url.startAccessingSecurityScopedResource()
         defer {
@@ -82,35 +68,14 @@ class EditLaunchOptionsViewModel {
         }
         
         do {
-            let currentLaunchOptions = launchOptions
-            if initialLaunchOptions.storageGb != currentLaunchOptions.storageGb {
-                saveProgress = .resizeDiskImage(0)
-                for try await percentage in diskUtilClient.resizeDiskImage(at: bundlePath.diskImageURL, toSizeInGiB: launchOptions.storageGb) {
-                    print("Progress: \(percentage)%")
-                    saveProgress = .resizeDiskImage(percentage)
-                }
+            for try await progress in lifecycleService.updateVMResources(bundlePath, newOptions: launchOptions) {
+                self.saveProgress = progress
             }
-            
-            saveProgress = .saveMetadata
-            
-            let metaDataURL = bundlePath.metaDataURL
-            
-            try await Task.detached(name: "Save Launch Option changes", priority: .userInitiated) {
-                if self.initialLaunchOptions != currentLaunchOptions {
-                    try data.write(to: metaDataURL)
-                    print("Successfully saved launch options: \(currentLaunchOptions)")
-                } else {
-                    print("Launch options were unchanged")
-                }
-            }.value
-            
-            isSaving = false
-            
-            return true
         } catch {
-            print("Failed to save launch options: \(error)")
+            NSLog("Failed to save launch options: \(error)")
             saveError = error
             isSaving = false
+            saveProgress = nil
         }
         
         return false

@@ -28,11 +28,11 @@ struct VMManagerApp: App {
     var body: some Scene {
         // Launch VM Window
         WindowGroup {
-            VmOverviewViewContainer()
+            VMOverviewViewContainer()
                 .modelContainer(modelContainer)
         }
         
-        WindowGroup(id: WindowId.virtualMachine.rawValue, for: VmLaunchParameters.self) { params in
+        WindowGroup(id: WindowId.virtualMachine.rawValue, for: VMLaunchParameters.self) { params in
             let context = modelContainer.mainContext
             if let params = params.wrappedValue,
                let instance = context.model(for: params.instanceId) as? VMInstance {

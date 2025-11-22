@@ -28,7 +28,7 @@ class VMFileSystemService {
     
     // MARK: - Bundle Management
     
-    func createBundle(at path: VmBundlePath) throws(VMFileSystemError) {
+    func createBundle(at path: VMBundlePath) throws(VMFileSystemError) {
         do {
             try FileManager.default.createDirectory(
                 atPath: path.url.path(percentEncoded: false),
@@ -39,7 +39,7 @@ class VMFileSystemService {
         }
     }
     
-    func validateBundle(at path: VmBundlePath) throws(VMFileSystemError) -> BundleValidationResult {
+    func validateBundle(at path: VMBundlePath) throws(VMFileSystemError) -> BundleValidationResult {
         guard FileManager.default.fileExists(atPath: path.url.path(percentEncoded: false)) else {
             return .missing(components: [.bundle])
         }
@@ -72,7 +72,7 @@ class VMFileSystemService {
         return missingComponents.isEmpty ? .valid : .missing(components: missingComponents)
     }
     
-    func repairBundle(at path: VmBundlePath) throws(VMFileSystemError) {
+    func repairBundle(at path: VMBundlePath) throws(VMFileSystemError) {
         let validationResult = try validateBundle(at: path)
         
         switch validationResult {
@@ -114,7 +114,7 @@ class VMFileSystemService {
         }
     }
     
-    func deleteBundle(at path: VmBundlePath) throws(VMFileSystemError) {
+    func deleteBundle(at path: VMBundlePath) throws(VMFileSystemError) {
         let accessGranted = path.url.startAccessingSecurityScopedResource()
         defer {
             if accessGranted {
@@ -131,7 +131,7 @@ class VMFileSystemService {
     
     // MARK: - File Operations
     
-    func copyRestoreImage(from sourceURL: URL, to bundlePath: VmBundlePath) async throws(VMFileSystemError) {
+    func copyRestoreImage(from sourceURL: URL, to bundlePath: VMBundlePath) async throws(VMFileSystemError) {
         let restoreImageURL = bundlePath.restoreImageURL
         
         do {
@@ -150,7 +150,7 @@ class VMFileSystemService {
         }
     }
     
-    func createAuxiliaryFiles(at path: VmBundlePath, config: VMCreationConfiguration, hardwareModel: VZMacHardwareModel) async throws(VMFileSystemError) {
+    func createAuxiliaryFiles(at path: VMBundlePath, config: VMCreationConfiguration, hardwareModel: VZMacHardwareModel) async throws(VMFileSystemError) {
         try await createDiskImage(at: path.diskImageURL, sizeInGb: config.launchOptions.storageGb)
         try createAuxiliaryStorage(at: path.auxiliaryStorageURL, with: hardwareModel)
         try createHardwareModel(at: path.hardwareModelURL, with: hardwareModel)
@@ -158,7 +158,7 @@ class VMFileSystemService {
         try createMetadata(at: path.metaDataURL, options: config.launchOptions)
     }
     
-    func updateMetadata(at path: VmBundlePath, launchOptions: LaunchOptions) throws(VMFileSystemError) {
+    func updateMetadata(at path: VMBundlePath, launchOptions: LaunchOptions) throws(VMFileSystemError) {
         try createMetadata(at: path.metaDataURL, options: launchOptions)
     }
     
@@ -202,7 +202,7 @@ class VMFileSystemService {
     
     // MARK: - Cleanup Operations
     
-    func cleanupTemporaryFiles(at path: VmBundlePath) throws(VMFileSystemError) {
+    func cleanupTemporaryFiles(at path: VMBundlePath) throws(VMFileSystemError) {
         let accessGranted = path.url.startAccessingSecurityScopedResource()
         defer {
             if accessGranted {
@@ -231,9 +231,22 @@ class VMFileSystemService {
         }
     }
     
-    func archiveBundle(at path: VmBundlePath, to archivePath: URL) throws(VMFileSystemError) {
+    func archiveBundle(at path: VMBundlePath, to archivePath: URL) throws(VMFileSystemError) {
         print("Archive called")
         // TODO: - Copy VM Bundle from path.url to archivePath
+    }
+    
+    func loadLaunchOptions(for bundlePath: VMBundlePath) -> LaunchOptions {
+        let metadataURL = bundlePath.metaDataURL
+        
+        do {
+            let data = try Data(contentsOf: metadataURL)
+            let decoder = BinaryMetadataCoder()
+            return decoder.decodeLaunchOptions(from: data)
+        } catch {
+            NSLog("Warning: Could not load launch options for \(bundlePath.bundleName), using defaults: \(error)")
+            return VMConfigHelper.defaultLaunchOptions
+        }
     }
     
     // MARK: - Private Helper Methods

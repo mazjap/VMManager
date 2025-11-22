@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
-struct VmLaunchParameters: Hashable, Codable {
+struct VMLaunchParameters: Hashable, Codable {
     var instanceId: PersistentIdentifier
     var isInRecoveryMode: Bool
 }
@@ -19,12 +19,12 @@ struct VMStats {
     let unlinkedCount: Int
 }
 
-enum VmOverviewViewFilePickerState {
+enum VMOverviewViewFilePickerState {
     case relinkingInstance(VMInstance)
     case importingExistingVirtualMachine
 }
 
-struct VmOverviewView: View {
+struct VMOverviewView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.modelContext) private var modelContext
     
@@ -34,7 +34,7 @@ struct VmOverviewView: View {
     @State private var sortOrder: VMSortOrder = .lastRun
     @State private var selectedInstance: VMInstance?
     
-    @State private var filePickerState: VmOverviewViewFilePickerState = .importingExistingVirtualMachine
+    @State private var filePickerState: VMOverviewViewFilePickerState = .importingExistingVirtualMachine
     @State private var isShowingFileSelector = false
     @State private var isShowingNewVMAlert = false
     
@@ -254,7 +254,7 @@ struct VmOverviewView: View {
     
     // TODO: - Add more launch options
     private func launchVM(_ instance: VMInstance, isInRecoveryMode: Bool) {
-        openWindow(id: WindowId.virtualMachine.rawValue, value: VmLaunchParameters(instanceId: instance.id, isInRecoveryMode: isInRecoveryMode))
+        openWindow(id: WindowId.virtualMachine.rawValue, value: VMLaunchParameters(instanceId: instance.id, isInRecoveryMode: isInRecoveryMode))
         instance.lastRanAt = Date()
         try? modelContext.save()
     }
@@ -266,7 +266,7 @@ struct VmOverviewView: View {
     
     private func relink(instance: VMInstance, withPath path: URL) {
         let instanceManager = InstanceManager(instance: instance, context: modelContext, isInRecoveryMode: false)
-        let vmBundlePath = try! VmBundlePath(bundleURL: path)
+        let vmBundlePath = try! VMBundlePath(bundleURL: path)
         instanceManager.bundlePath = vmBundlePath
         updateLinkStatus(for: instance)
     }
@@ -277,7 +277,7 @@ struct VmOverviewView: View {
             return
         }
         
-        let bundlePath = try VmBundlePath(bundleURL: path)
+        let bundlePath = try VMBundlePath(bundleURL: path)
         
         let successfullyAuthorized = path.startAccessingSecurityScopedResource()
         defer {
@@ -303,7 +303,7 @@ struct VmOverviewView: View {
     private func updateLinkStatus(for instance: VMInstance, shouldSave: Bool = true) {
         do {
             let url = try instance.getSecurityScopedURL()
-            let path = try VmBundlePath(bundleURL: url)
+            let path = try VMBundlePath(bundleURL: url)
             
             instance.isLinked = FileManager.default.fileExists(atPath: path.url.path(percentEncoded: false))
         } catch {
@@ -317,19 +317,19 @@ struct VmOverviewView: View {
 }
 
 #Preview {
-    VmOverviewView(instances: [])
+    VMOverviewView(instances: [])
         .frame(width: 900, height: 600)
 }
 
 
 /// SwiftData's Query macro causes self to not be inspectable in LLDB which is
 /// super annoying. I created this container to do the query stuff and then pass the
-/// array to `VmOverviewView` so that `VmOverviewView` can be debugged.
-struct VmOverviewViewContainer: View {
+/// array to `VMOverviewView` so that `VMOverviewView` can be debugged.
+struct VMOverviewViewContainer: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \VMInstance.createdAt) private var instances: [VMInstance]
     
     var body: some View {
-        VmOverviewView(instances: instances)
+        VMOverviewView(instances: instances)
     }
 }

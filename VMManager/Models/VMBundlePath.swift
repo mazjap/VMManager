@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated
-struct VmBundlePath: Codable, Hashable, Sendable {
+struct VMBundlePath: Codable, Hashable, Sendable {
     let url: URL
     
     var containerURL: URL {
@@ -52,7 +52,7 @@ struct VmBundlePath: Codable, Hashable, Sendable {
         self.url = bundleURL
     }
     
-    static let `default` = VmBundlePath(containerURL: FileManager.default.homeDirectoryForCurrentUser, bundleName: "VM")
+    static let `default` = VMBundlePath(containerURL: FileManager.default.homeDirectoryForCurrentUser, bundleName: "VM")
     private static let `extension` = "bundle"
 }
 
@@ -64,7 +64,7 @@ enum BundleComponent: String, CaseIterable {
     case machineIdentifier = "Machine Identifier"
     case metadata = "Metadata"
     
-    func path(in bundlePath: VmBundlePath) -> URL {
+    func path(in bundlePath: VMBundlePath) -> URL {
         switch self {
         case .bundle:
             return bundlePath.url
