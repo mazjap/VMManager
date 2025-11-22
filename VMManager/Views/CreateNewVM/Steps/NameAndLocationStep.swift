@@ -6,10 +6,10 @@ struct NameAndLocationStep: View {
     @Binding private var filePickerState: FilePickerState
     @Binding private var isFilePickerPresented: Bool
     
-    private let bundlePath: VmBundlePath
+    private let bundlePath: VMBundlePath
     private let validateName: () -> Void
     
-    init(vmName: Binding<String>, nameError: Binding<String?>, filePickerState: Binding<FilePickerState>, isFilePickerPresented: Binding<Bool>, bundlePath: VmBundlePath, validateName: @escaping () -> Void) {
+    init(vmName: Binding<String>, nameError: Binding<String?>, filePickerState: Binding<FilePickerState>, isFilePickerPresented: Binding<Bool>, bundlePath: VMBundlePath, validateName: @escaping () -> Void) {
         self._vmName = vmName
         self._nameError = nameError
         self._filePickerState = filePickerState

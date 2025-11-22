@@ -26,15 +26,15 @@ class InstanceManager: Identifiable {
         }
     }
     
-    var bundlePath: VmBundlePath {
+    var bundlePath: VMBundlePath {
         get {
             do {
-                return try VmBundlePath(bundleURL: instance.getSecurityScopedURL())
+                return try VMBundlePath(bundleURL: instance.getSecurityScopedURL())
             } catch URLBookmarkError.dataIsStale {
                 self.bundlePath = instance.bundlePath // This should cause the setter to run
                 
                 do {
-                    return try VmBundlePath(bundleURL: instance.getSecurityScopedURL())
+                    return try VMBundlePath(bundleURL: instance.getSecurityScopedURL())
                 } catch {
                     fatalError("After recreating the bookmark data: \(error)")
                 }
@@ -81,11 +81,11 @@ class InstanceManager: Identifiable {
 
 extension InstanceManager {
     convenience init(name: String, path: URL, context: ModelContext, isInRecoveryMode: Bool) {
-        let vmBundlePath = VmBundlePath(containerURL: path, bundleName: name)
+        let vmBundlePath = VMBundlePath(containerURL: path, bundleName: name)
         self.init(vmBundlePath: vmBundlePath, context: context, isInRecoveryMode: isInRecoveryMode)
     }
     
-    convenience init(vmBundlePath: VmBundlePath, context: ModelContext, isInRecoveryMode: Bool) {
+    convenience init(vmBundlePath: VMBundlePath, context: ModelContext, isInRecoveryMode: Bool) {
         let bookmarkData = Self.createSecurityScopedBookmark(from: vmBundlePath.url)
         let instance = VMInstance(name: vmBundlePath.bundleName, bundlePath: vmBundlePath, pathBookmark: bookmarkData)
         

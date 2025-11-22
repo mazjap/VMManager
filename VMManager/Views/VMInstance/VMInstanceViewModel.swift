@@ -77,7 +77,7 @@ class VMInstanceViewModel {
         }
     }
     
-    func restoreVirtualMachine(paths: VmBundlePath) async throws {
+    func restoreVirtualMachine(paths: VMBundlePath) async throws {
         virtualMachine = try await vmLifecycleService.restoreVMState(for: instance.instance)
         instance.didStartVM()
     }

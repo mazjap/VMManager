@@ -2,6 +2,11 @@ import Foundation
 import Virtualization
 
 class VMConfigurationValidator {
+    private let fileSystemService: VMFileSystemService
+    
+    init(fileSystemService: VMFileSystemService = VMFileSystemService()) {
+        self.fileSystemService = fileSystemService
+    }
     
     // MARK: - System Validation
     
@@ -49,7 +54,7 @@ class VMConfigurationValidator {
     }
     
     /// Validates launch options against system capabilities and VM requirements
-    func validateLaunchOptions(_ options: LaunchOptions, for instance: VMInstance? = nil, requiresDisk: Bool = false) throws {
+    func validateLaunchOptions(_ options: LaunchOptions, for bundlePath: VMBundlePath? = nil, requiresDisk: Bool = false) throws {
         let maxCPUs = VZVirtualMachineConfiguration.maximumAllowedCPUCount
         let minCPUs = VZVirtualMachineConfiguration.minimumAllowedCPUCount
         let availableCPUs = ProcessInfo.processInfo.processorCount
@@ -113,8 +118,8 @@ class VMConfigurationValidator {
             }
             
             // Check if we're updating an existing VM
-            if let instance = instance {
-                let currentOptions = try loadCurrentLaunchOptions(for: instance)
+            if let bundlePath {
+                let currentOptions = fileSystemService.loadLaunchOptions(for: bundlePath)
                 if options.storageGb < currentOptions.storageGb {
                     throw VMValidationError.diskShrinkNotSupported(
                         current: currentOptions.storageGb,
@@ -175,7 +180,7 @@ class VMConfigurationValidator {
     }
     
     /// Validates hardware model file integrity
-    func validateHardwareModel(at bundlePath: VmBundlePath) throws -> VZMacHardwareModel {
+    func validateHardwareModel(at bundlePath: VMBundlePath) throws -> VZMacHardwareModel {
         let hardwareModelURL = bundlePath.hardwareModelURL
         
         guard FileManager.default.fileExists(atPath: hardwareModelURL.path(percentEncoded: false)) else {
@@ -223,11 +228,11 @@ class VMConfigurationValidator {
         _ = try validateHardwareModel(at: instance.bundlePath)
         
         // Validate current launch options
-        let currentOptions = try loadCurrentLaunchOptions(for: instance)
-        try validateLaunchOptions(currentOptions, for: instance)
+        let currentOptions = fileSystemService.loadLaunchOptions(for: instance.bundlePath)
+        try validateLaunchOptions(currentOptions, for: instance.bundlePath)
         
         // Check if bundle components are present and valid
-        // This would use your VMFileSystemService validation
+        let result = try fileSystemService.validateBundle(at: instance.bundlePath)
     }
     
     /// Validates upgrade compatibility between old and new configurations
@@ -241,23 +246,7 @@ class VMConfigurationValidator {
         }
         
         // Validate the new options are within bounds
-        try validateLaunchOptions(newOptions, requiresDisk: false)
-        
-        // Check if memory decrease is too dramatic (more than 50%)
-        if newOptions.memoryGb < oldOptions.memoryGb / 2 {
-            throw VMValidationError.memoryReductionTooLarge(
-                current: oldOptions.memoryGb,
-                requested: newOptions.memoryGb
-            )
-        }
-        
-        // Check if CPU decrease is too dramatic
-        if newOptions.cpuCores < oldOptions.cpuCores / 2 {
-            throw VMValidationError.cpuReductionTooLarge(
-                current: oldOptions.cpuCores,
-                requested: newOptions.cpuCores
-            )
-        }
+        try validateLaunchOptions(newOptions, requiresDisk: true)
     }
     
     // MARK: - Path and Name Validation
@@ -308,21 +297,6 @@ class VMConfigurationValidator {
             throw VMValidationError.containerPathNotWritable(url: url)
         }
     }
-    
-    // MARK: - Helper Methods
-    
-    private func loadCurrentLaunchOptions(for instance: VMInstance) throws -> LaunchOptions {
-        let metadataURL = instance.bundlePath.metaDataURL
-        
-        do {
-            let data = try Data(contentsOf: metadataURL)
-            let decoder = BinaryMetadataCoder()
-            return decoder.decodeLaunchOptions(from: data)
-        } catch {
-            NSLog("Warning: Could not load launch options for \(instance.name), using defaults: \(error)")
-            return VMConfigHelper.defaultLaunchOptions
-        }
-    }
 }
 
 // MARK: - Error Types
@@ -356,10 +330,10 @@ enum VMValidationError: LocalizedError {
     case invalidRestoreImage(url: URL, underlying: Error)
     
     // Hardware model validation errors
-    case hardwareModelNotFound(bundlePath: VmBundlePath)
-    case invalidHardwareModel(bundlePath: VmBundlePath)
-    case hardwareModelNotSupported(bundlePath: VmBundlePath)
-    case hardwareModelReadError(bundlePath: VmBundlePath, underlying: Error)
+    case hardwareModelNotFound(bundlePath: VMBundlePath)
+    case invalidHardwareModel(bundlePath: VMBundlePath)
+    case hardwareModelNotSupported(bundlePath: VMBundlePath)
+    case hardwareModelReadError(bundlePath: VMBundlePath, underlying: Error)
     
     // Configuration validation errors
     case configurationValidationFailed(underlying: Error)

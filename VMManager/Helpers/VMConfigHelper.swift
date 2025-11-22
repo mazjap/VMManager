@@ -38,7 +38,7 @@ enum VMConfigHelper {
         return VZMacOSBootLoader()
     }
 
-    static func createBlockDeviceConfiguration(paths: VmBundlePath) -> VZVirtioBlockDeviceConfiguration {
+    static func createBlockDeviceConfiguration(paths: VMBundlePath) -> VZVirtioBlockDeviceConfiguration {
         do {
             let diskImageAttachment = try VZDiskImageStorageDeviceAttachment(url: paths.diskImageURL, readOnly: false)
             let disk = VZVirtioBlockDeviceConfiguration(attachment: diskImageAttachment)

@@ -62,8 +62,8 @@ struct CreateNewVMView: View {
     
     @State private var nameError: String?
     
-    private var bundlePath: VmBundlePath {
-        VmBundlePath(containerURL: vmPath, bundleName: vmName)
+    private var bundlePath: VMBundlePath {
+        VMBundlePath(containerURL: vmPath, bundleName: vmName)
     }
     
     private var spaceAvailableInGb: UInt {

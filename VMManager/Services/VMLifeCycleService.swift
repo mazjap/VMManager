@@ -104,7 +104,7 @@ class VMLifecycleService {
                     continuation.yield(.validating)
                     try await validator.validateConfiguration(configuration)
                     
-                    let bundlePath = VmBundlePath(containerURL: configuration.containerURL, bundleName: configuration.name)
+                    let bundlePath = VMBundlePath(containerURL: configuration.containerURL, bundleName: configuration.name)
                     
                     // Create bundle
                     continuation.yield(.creatingBundle)
@@ -167,8 +167,8 @@ class VMLifecycleService {
                     
                     // Load configuration
                     continuation.yield(.loadingConfiguration)
-                    let launchOptions = try loadLaunchOptions(for: instance)
-                    try validator.validateLaunchOptions(launchOptions, for: instance)
+                    let launchOptions = fileSystemService.loadLaunchOptions(for: instance.bundlePath)
+                    try validator.validateLaunchOptions(launchOptions, for: instance.bundlePath)
                     
                     // Create VM configuration
                     let config = try await createVMConfiguration(instance: instance, options: launchOptions)
@@ -194,22 +194,22 @@ class VMLifecycleService {
     // MARK: - Resource Management with Progress
     
     /// Updates VM resources by modifying disk size and metadata
-    func updateVMResources(_ instance: VMInstance, newOptions: LaunchOptions) -> AsyncThrowingStream<VMResourceUpdateProgress, Error> {
+    func updateVMResources(_ bundlePath: VMBundlePath, newOptions: LaunchOptions) -> AsyncThrowingStream<VMResourceUpdateProgress, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
                     // Validate new configuration
                     continuation.yield(.validating)
-                    try validator.validateLaunchOptions(newOptions, for: instance)
+                    try validator.validateLaunchOptions(newOptions, for: bundlePath, requiresDisk: true)
                     
                     // Load current options to check what changed
-                    let currentOptions = try loadLaunchOptions(for: instance)
+                    let currentOptions = fileSystemService.loadLaunchOptions(for: bundlePath)
                     try validator.validateUpgradeCompatibility(from: currentOptions, to: newOptions)
                     
                     // Update disk size if changed
                     if newOptions.storageGb != currentOptions.storageGb {
                         for try await progress in diskUtilityClient.resizeDiskImage(
-                            at: instance.bundlePath.diskImageURL,
+                            at: bundlePath.diskImageURL,
                             toSizeInGiB: newOptions.storageGb
                         ) {
                             continuation.yield(.resizingDisk(percentage: progress))
@@ -218,7 +218,7 @@ class VMLifecycleService {
                     
                     // Update metadata
                     continuation.yield(.updatingMetadata)
-                    try fileSystemService.updateMetadata(at: instance.bundlePath, launchOptions: newOptions)
+                    try fileSystemService.updateMetadata(at: bundlePath, launchOptions: newOptions)
                     
                     continuation.yield(.complete)
                     continuation.finish()
@@ -249,7 +249,7 @@ class VMLifecycleService {
     }
     
     func restoreVMState(for instance: VMInstance) async throws -> VZVirtualMachine {
-        let launchOptions = try loadLaunchOptions(for: instance)
+        let launchOptions = fileSystemService.loadLaunchOptions(for: instance.bundlePath)
         let config = try await createVMConfiguration(instance: instance, options: launchOptions)
         let virtualMachine = VZVirtualMachine(configuration: config)
         
@@ -284,7 +284,7 @@ class VMLifecycleService {
     
     // MARK: - Private Implementation with Progress
     
-    private func downloadRestoreImage(to bundlePath: VmBundlePath) -> AsyncThrowingStream<Double, Error> {
+    private func downloadRestoreImage(to bundlePath: VMBundlePath) -> AsyncThrowingStream<Double, Error> {
         AsyncThrowingStream { continuation in
             let box = Box()
             
@@ -320,7 +320,7 @@ class VMLifecycleService {
                         await box.cancel()
                     }
                 }
-                // Monitor download progress
+                
                 let cancellable = task.publisher(for: \.progress.fractionCompleted)
                     .receive(on: DispatchQueue.main)
                     .sink { fractionComplete in
@@ -331,14 +331,12 @@ class VMLifecycleService {
                     await box.setCancellable(cancellable)
                 }
                 
-                // Store the observer so it doesn't get deallocated
-                // In a real implementation, you'd want to manage this properly
                 task.resume()
             }
         }
     }
     
-    private func installMacOS(at bundlePath: VmBundlePath, configuration: VMCreationConfiguration, restoreImage: VZMacOSRestoreImage) -> AsyncThrowingStream<Double, Error> {
+    private func installMacOS(at bundlePath: VMBundlePath, configuration: VMCreationConfiguration, restoreImage: VZMacOSRestoreImage) -> AsyncThrowingStream<Double, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -357,7 +355,7 @@ class VMLifecycleService {
                     
                     let installer = VZMacOSInstaller(virtualMachine: virtualMachine, restoringFromImageAt: bundlePath.restoreImageURL)
                     
-                    // Monitor installation progress
+                    
                     let cancellable = installer.publisher(for: \.progress.fractionCompleted)
                         .receive(on: DispatchQueue.main)
                         .sink { fraction in
@@ -392,19 +390,6 @@ class VMLifecycleService {
     
     // MARK: - Other Private Helper Methods
     
-    private func loadLaunchOptions(for instance: VMInstance) throws -> LaunchOptions {
-        let metadataURL = instance.bundlePath.metaDataURL
-        
-        do {
-            let data = try Data(contentsOf: metadataURL)
-            let decoder = BinaryMetadataCoder()
-            return decoder.decodeLaunchOptions(from: data)
-        } catch {
-            NSLog("Warning: Could not load launch options for \(instance.name), using defaults: \(error)")
-            return VMConfigHelper.defaultLaunchOptions
-        }
-    }
-    
     private func getRestoreImageFrom(ipswURL: URL) async throws -> VZMacOSRestoreImage {
         try await withCheckedThrowingContinuation { continuation in
             VZMacOSRestoreImage.load(from: ipswURL) { result in
@@ -419,17 +404,13 @@ class VMLifecycleService {
     }
     
     private func createVMConfiguration(instance: VMInstance, options: LaunchOptions) async throws -> VZVirtualMachineConfiguration {
-        // Your existing VM configuration creation logic from VMInstanceViewModel
         let config = VZVirtualMachineConfiguration()
         
-        // Platform configuration
         config.platform = try createMacPlatformConfiguration(bundlePath: instance.bundlePath)
         
-        // Resource configuration
         config.cpuCount = Int(options.cpuCores)
         config.memorySize = UInt64(options.memoryGb) * 1024 * 1024 * 1024
         
-        // Device configurations
         config.bootLoader = VMConfigHelper.createBootLoader()
         config.audioDevices = [VMConfigHelper.createSoundDeviceConfiguration()]
         config.graphicsDevices = [VMConfigHelper.createGraphicsDeviceConfiguration()]
@@ -443,29 +424,25 @@ class VMLifecycleService {
         return config
     }
     
-    private func createMacPlatformConfiguration(bundlePath: VmBundlePath) throws -> VZMacPlatformConfiguration {
+    private func createMacPlatformConfiguration(bundlePath: VMBundlePath) throws -> VZMacPlatformConfiguration {
         let macPlatform = VZMacPlatformConfiguration()
         
-        // Load hardware model
         let hardwareModel = try validator.validateHardwareModel(at: bundlePath)
         macPlatform.hardwareModel = hardwareModel
         
-        // Load machine identifier
         let machineIdentifierData = try Data(contentsOf: bundlePath.machineIdentifierURL)
         guard let machineIdentifier = VZMacMachineIdentifier(dataRepresentation: machineIdentifierData) else {
             throw VMLifecycleError.configurationInvalid("Invalid machine identifier")
         }
         macPlatform.machineIdentifier = machineIdentifier
         
-        // Set auxiliary storage
         let auxiliaryStorage = VZMacAuxiliaryStorage(url: bundlePath.auxiliaryStorageURL)
         macPlatform.auxiliaryStorage = auxiliaryStorage
         
         return macPlatform
     }
     
-    private func setupVirtualMachine(macOSConfiguration: VZMacOSConfigurationRequirements, bundlePath: VmBundlePath, launchOptions: LaunchOptions) async throws -> VZVirtualMachineConfiguration {
-        // Similar to your existing logic but with the new configuration structure
+    private func setupVirtualMachine(macOSConfiguration: VZMacOSConfigurationRequirements, bundlePath: VMBundlePath, launchOptions: LaunchOptions) async throws -> VZVirtualMachineConfiguration {
         let config = VZVirtualMachineConfiguration()
         
         config.platform = try createMacPlatformConfigurationForInstall(macOSConfiguration: macOSConfiguration, bundlePath: bundlePath)
@@ -485,8 +462,7 @@ class VMLifecycleService {
         return config
     }
     
-    private func createMacPlatformConfigurationForInstall(macOSConfiguration: VZMacOSConfigurationRequirements, bundlePath: VmBundlePath) throws -> VZMacPlatformConfiguration {
-        // This is for installation, so we create new hardware model and machine identifier
+    private func createMacPlatformConfigurationForInstall(macOSConfiguration: VZMacOSConfigurationRequirements, bundlePath: VMBundlePath) throws -> VZMacPlatformConfiguration {
         let macPlatformConfiguration = VZMacPlatformConfiguration()
         
         let auxiliaryStorage = VZMacAuxiliaryStorage(url: bundlePath.auxiliaryStorageURL)
@@ -497,8 +473,6 @@ class VMLifecycleService {
         return macPlatformConfiguration
     }
 }
-
-// MARK: - Updated Error Types
 
 enum VMLifecycleError: LocalizedError {
     case bundleNotReady(BundleValidationResult)
