@@ -6,6 +6,7 @@ import SwiftData
 // Seperation of concerns/better project structure
 // Shared clipboard between VM and host
 // Drag and drop files between VM and host
+// Show status of VM in the VmOverviewView (Launching, launched, shutting down, etc.)
 
 @main
 struct VMManagerApp: App {
