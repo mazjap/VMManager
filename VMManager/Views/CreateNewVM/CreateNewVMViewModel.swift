@@ -12,12 +12,15 @@ enum NewVMError: Error {
 class CreateNewVMViewModel {
     private(set) var progress: VMCreationProgress?
     var launchOptions = VMConfigHelper.defaultLaunchOptions
-    private let vmLifecycleService: VMLifecycleService
+    private let lifecycleService: VMLifecycleService
+    private let configValidator: VMConfigurationValidator
+    private(set) var error: VMValidationError.ResourceValidationError?
     
-    init(progress: VMCreationProgress? = nil, launchOptions: LaunchOptions = VMConfigHelper.defaultLaunchOptions, vmLifecycleService: VMLifecycleService = VMLifecycleService()) {
+    init(progress: VMCreationProgress? = nil, launchOptions: LaunchOptions = VMConfigHelper.defaultLaunchOptions, lifecycleService: VMLifecycleService = VMLifecycleService(), configValidator: VMConfigurationValidator = VMConfigurationValidator()) {
         self.progress = progress
         self.launchOptions = launchOptions
-        self.vmLifecycleService = vmLifecycleService
+        self.lifecycleService = lifecycleService
+        self.configValidator = configValidator
     }
     
     func isDownloading() -> Bool {
@@ -30,6 +33,14 @@ class CreateNewVMViewModel {
     func finish() {
         if case .complete = progress {
             progress = nil
+        }
+    }
+    
+    func validateLaunchOptions() {
+        do {
+            try configValidator.validateLaunchOptions(launchOptions)
+        } catch {
+            self.error = error
         }
     }
     
@@ -47,7 +58,7 @@ class CreateNewVMViewModel {
         }
         
         do {
-            for try await progress in vmLifecycleService.createAndInstallVM(
+            for try await progress in lifecycleService.createAndInstallVM(
                 configuration: VMCreationConfiguration(
                     name: name,
                     containerURL: containerURL,
