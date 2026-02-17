@@ -54,20 +54,20 @@ class VMConfigurationValidator {
     }
     
     /// Validates launch options against system capabilities and VM requirements
-    func validateLaunchOptions(_ options: LaunchOptions, for bundlePath: VMBundlePath? = nil, requiresDisk: Bool = false) throws {
+    func validateLaunchOptions(_ options: LaunchOptions, for bundlePath: VMBundlePath? = nil, requiresDisk: Bool = false) throws(VMValidationError.ResourceValidationError) {
         let maxCPUs = VZVirtualMachineConfiguration.maximumAllowedCPUCount
         let minCPUs = VZVirtualMachineConfiguration.minimumAllowedCPUCount
         let availableCPUs = ProcessInfo.processInfo.processorCount
         
         guard options.cpuCores >= UInt(minCPUs) else {
-            throw VMValidationError.cpuCountTooLow(
+            throw .cpuCountTooLow(
                 requested: options.cpuCores,
                 minimum: UInt(minCPUs)
             )
         }
         
         guard options.cpuCores <= UInt(maxCPUs) else {
-            throw VMValidationError.cpuCountTooHigh(
+            throw .cpuCountTooHigh(
                 requested: options.cpuCores,
                 maximum: UInt(maxCPUs)
             )
@@ -75,7 +75,7 @@ class VMConfigurationValidator {
         
         // Leave at least 1 CPU for the host
         guard options.cpuCores < UInt(availableCPUs) else {
-            throw VMValidationError.cpuCountExceedsAvailable(
+            throw .cpuCountExceedsAvailable(
                 requested: options.cpuCores,
                 available: UInt(availableCPUs - 1)
             )
@@ -87,14 +87,14 @@ class VMConfigurationValidator {
         let availableMemory = ProcessInfo.processInfo.physicalMemory
         
         guard requestedMemoryBytes >= minMemory else {
-            throw VMValidationError.memoryTooLow(
+            throw .memoryTooLow(
                 requested: options.memoryGb,
                 minimum: UInt(minMemory / (1024 * 1024 * 1024))
             )
         }
         
         guard requestedMemoryBytes <= maxMemory else {
-            throw VMValidationError.memoryTooHigh(
+            throw .memoryTooHigh(
                 requested: options.memoryGb,
                 maximum: UInt(maxMemory / (1024 * 1024 * 1024))
             )
@@ -103,7 +103,7 @@ class VMConfigurationValidator {
         // Leave at least 4GB for the host system
         let hostReservedMemory: UInt64 = 4 * 1024 * 1024 * 1024
         guard requestedMemoryBytes + hostReservedMemory <= availableMemory else {
-            throw VMValidationError.memoryExceedsAvailable(
+            throw .memoryExceedsAvailable(
                 requested: options.memoryGb,
                 available: UInt((availableMemory - hostReservedMemory) / (1024 * 1024 * 1024))
             )
@@ -111,7 +111,7 @@ class VMConfigurationValidator {
         
         if requiresDisk {
             guard options.storageGb >= 32 else {
-                throw VMValidationError.diskTooSmall(
+                throw .diskTooSmall(
                     requested: options.storageGb,
                     minimum: 32
                 )
@@ -121,7 +121,7 @@ class VMConfigurationValidator {
             if let bundlePath {
                 let currentOptions = fileSystemService.loadLaunchOptions(for: bundlePath)
                 if options.storageGb < currentOptions.storageGb {
-                    throw VMValidationError.diskShrinkNotSupported(
+                    throw .diskShrinkNotSupported(
                         current: currentOptions.storageGb,
                         requested: options.storageGb
                     )
@@ -233,6 +233,12 @@ class VMConfigurationValidator {
         
         // Check if bundle components are present and valid
         let result = try fileSystemService.validateBundle(at: instance.bundlePath)
+        
+        if case .valid = result {
+            return // We good
+        } else {
+            // TODO: - Throw a new error which will be displayed to the user, potentially allowing for automatic repairing, if the user decides to.
+        }
     }
     
     /// Validates upgrade compatibility between old and new configurations
@@ -302,118 +308,364 @@ class VMConfigurationValidator {
 // MARK: - Error Types
 
 enum VMValidationError: LocalizedError {
-    // System validation errors
-    case virtualizationNotSupported
-    case insufficientSystemMemory(available: UInt64, required: UInt64)
-    case insufficientCPUCores(available: Int, required: Int)
+    case system(SystemValidationError)
+    case resource(ResourceValidationError)
+    case restoreImage(RestoreImageValidationError)
+    case hardwareModel(HardwareModelValidationError)
+    case configuration(ConfigurationValidationError)
+    case nameAndPath(NameAndPathValidationError)
     
-    // Resource validation errors
-    case cpuCountTooLow(requested: UInt, minimum: UInt)
-    case cpuCountTooHigh(requested: UInt, maximum: UInt)
-    case cpuCountExceedsAvailable(requested: UInt, available: UInt)
-    case cpuReductionTooLarge(current: UInt, requested: UInt)
-    
-    case memoryTooLow(requested: UInt, minimum: UInt)
-    case memoryTooHigh(requested: UInt, maximum: UInt)
-    case memoryExceedsAvailable(requested: UInt, available: UInt)
-    case memoryReductionTooLarge(current: UInt, requested: UInt)
-    
-    case diskTooSmall(requested: UInt, minimum: UInt)
-    case diskShrinkNotSupported(current: UInt, requested: UInt)
-    case insufficientDiskSpace(available: UInt, required: UInt)
-    case diskSpaceCheckFailed(underlying: Error)
-    
-    // Restore image validation errors
-    case restoreImageNotFound(url: URL)
-    case restoreImageTooSmall(url: URL, size: Int64)
-    case restoreImageAccessError(url: URL, underlying: Error)
-    case invalidRestoreImage(url: URL, underlying: Error)
-    
-    // Hardware model validation errors
-    case hardwareModelNotFound(bundlePath: VMBundlePath)
-    case invalidHardwareModel(bundlePath: VMBundlePath)
-    case hardwareModelNotSupported(bundlePath: VMBundlePath)
-    case hardwareModelReadError(bundlePath: VMBundlePath, underlying: Error)
-    
-    // Configuration validation errors
-    case configurationValidationFailed(underlying: Error)
-    case saveRestoreNotSupported(underlying: Error)
-    
-    // Name and path validation errors
-    case nameEmpty
-    case nameTooLong(name: String, maxLength: Int)
-    case nameContainsInvalidCharacters(name: String)
-    case nameHasLeadingOrTrailingWhitespace(name: String)
-    case nameIsReserved(name: String)
-    
-    case containerPathNotFound(url: URL)
-    case containerPathNotDirectory(url: URL)
-    case containerPathNotWritable(url: URL)
-    
-    var errorDescription: String? {
+    private var underlying: LocalizedError {
         switch self {
-        case .virtualizationNotSupported:
-            return "Virtualization is not supported on this system"
-        case .insufficientSystemMemory(let available, let required):
-            return "Insufficient system memory: \(available / (1024*1024*1024))GB available, \(required / (1024*1024*1024))GB required"
-        case .insufficientCPUCores(let available, let required):
-            return "Insufficient CPU cores: \(available) available, \(required) required"
-        case .cpuCountTooLow(let requested, let minimum):
-            return "CPU count too low: \(requested) requested, minimum \(minimum)"
-        case .cpuCountTooHigh(let requested, let maximum):
-            return "CPU count too high: \(requested) requested, maximum \(maximum)"
-        case .cpuCountExceedsAvailable(let requested, let available):
-            return "CPU count exceeds available: \(requested) requested, \(available) available"
-        case .memoryTooLow(let requested, let minimum):
-            return "Memory too low: \(requested)GB requested, minimum \(minimum)GB"
-        case .memoryTooHigh(let requested, let maximum):
-            return "Memory too high: \(requested)GB requested, maximum \(maximum)GB"
-        case .memoryExceedsAvailable(let requested, let available):
-            return "Memory exceeds available: \(requested)GB requested, \(available)GB available"
-        case .diskTooSmall(let requested, let minimum):
-            return "Disk size too small: \(requested)GB requested, minimum \(minimum)GB"
-        case .diskShrinkNotSupported(let current, let requested):
-            return "Cannot shrink disk from \(current)GB to \(requested)GB"
-        case .insufficientDiskSpace(let available, let required):
-            return "Insufficient disk space: \(available)GB available, \(required)GB required"
-        case .restoreImageNotFound(let url):
-            return "Restore image not found at \(url.lastPathComponent)"
-        case .invalidRestoreImage(let url, _):
-            return "Invalid restore image: \(url.lastPathComponent)"
-        case .hardwareModelNotSupported:
-            return "Hardware model is not supported on this system"
-        case .nameEmpty:
-            return "VM name cannot be empty"
-        case .nameContainsInvalidCharacters(let name):
-            return "VM name '\(name)' contains invalid characters"
-        case .nameHasLeadingOrTrailingWhitespace(let name):
-            return "VM name '\(name)' contains leading or trailing whitespace"
-        case .containerPathNotWritable(let url):
-            return "Cannot write to selected path: \(url.path(percentEncoded: false))"
-        default:
-            return "VM configuration validation failed"
+        case .system(let systemValidationError):
+            systemValidationError
+        case .resource(let resourceValidationError):
+            resourceValidationError
+        case .restoreImage(let restoreImageValidationError):
+            restoreImageValidationError
+        case .hardwareModel(let hardwareModelValidationError):
+            hardwareModelValidationError
+        case .configuration(let configurationValidationError):
+            configurationValidationError
+        case .nameAndPath(let nameAndPathValidationError):
+            nameAndPathValidationError
         }
     }
     
+    var errorDescription: String? {
+        underlying.errorDescription
+    }
+    
     var recoverySuggestion: String? {
-        switch self {
-        case .insufficientSystemMemory, .insufficientCPUCores:
-            return "Try reducing the VM resource allocation or upgrade your system"
-        case .cpuCountExceedsAvailable, .memoryExceedsAvailable:
-            return "Reduce the allocated resources to leave some for the host system"
-        case .diskShrinkNotSupported:
-            return "Disk size can only be increased, not decreased"
-        case .insufficientDiskSpace:
-            return "Free up disk space or choose a different location"
-        case .invalidRestoreImage:
-            return "Select a valid macOS restore image (.ipsw file)"
-        case .nameContainsInvalidCharacters:
-            return "Use only letters, numbers, spaces, and basic punctuation"
-        case .containerPathNotWritable:
-            return "Choose a different location or check folder permissions"
-        default:
-            return "Check your configuration and try again"
+        underlying.recoverySuggestion
+    }
+}
+
+extension VMValidationError {
+    enum SystemValidationError: LocalizedError {
+        case virtualizationNotSupported
+        case insufficientSystemMemory(available: UInt64, required: UInt64)
+        case insufficientCPUCores(available: Int, required: Int)
+        
+        var errorDescription: String? {
+            switch self {
+            case .virtualizationNotSupported:
+                return "Virtualization is not supported on this system"
+            case .insufficientSystemMemory(let available, let required):
+                return "Insufficient system memory: \(available / (1024*1024*1024))GB available, \(required / (1024*1024*1024))GB required"
+            case .insufficientCPUCores(let available, let required):
+                return "Insufficient CPU cores: \(available) available, \(required) required"
+            }
         }
+        
+        var recoverySuggestion: String? {
+            switch self {
+            case .insufficientSystemMemory, .insufficientCPUCores:
+                return "Try reducing the VM resource allocation or upgrade your system"
+            case .virtualizationNotSupported:
+                return "Check your configuration and try again"
+            }
+        }
+    }
+    
+    static let virtualizationNotSupported: Self = .system(.virtualizationNotSupported)
+    
+    static func insufficientSystemMemory(available: UInt64, required: UInt64) -> Self {
+        return .system(.insufficientSystemMemory(available: available, required: required))
+    }
+    
+    static func insufficientCPUCores(available: Int, required: Int) -> Self {
+        return .system(.insufficientCPUCores(available: available, required: required))
+    }
+}
+
+extension VMValidationError {
+    enum ResourceValidationError: LocalizedError {
+        case cpuCountTooLow(requested: UInt, minimum: UInt)
+        case cpuCountTooHigh(requested: UInt, maximum: UInt)
+        case cpuCountExceedsAvailable(requested: UInt, available: UInt)
+        case cpuReductionTooLarge(current: UInt, requested: UInt)
+        
+        case memoryTooLow(requested: UInt, minimum: UInt)
+        case memoryTooHigh(requested: UInt, maximum: UInt)
+        case memoryExceedsAvailable(requested: UInt, available: UInt)
+        case memoryReductionTooLarge(current: UInt, requested: UInt)
+        
+        case diskTooSmall(requested: UInt, minimum: UInt)
+        case diskShrinkNotSupported(current: UInt, requested: UInt)
+        case insufficientDiskSpace(available: UInt, required: UInt)
+        case diskSpaceCheckFailed(underlying: Error)
+        
+        var errorDescription: String? {
+            switch self {
+            case .cpuCountTooLow(let requested, let minimum):
+                return "CPU count too low: \(requested) requested, minimum \(minimum)"
+            case .cpuCountTooHigh(let requested, let maximum):
+                return "CPU count too high: \(requested) requested, maximum \(maximum)"
+            case .cpuCountExceedsAvailable(let requested, let available):
+                return "CPU count exceeds available: \(requested) requested, \(available) available"
+            case .memoryTooLow(let requested, let minimum):
+                return "Memory too low: \(requested)GB requested, minimum \(minimum)GB"
+            case .memoryTooHigh(let requested, let maximum):
+                return "Memory too high: \(requested)GB requested, maximum \(maximum)GB"
+            case .memoryExceedsAvailable(let requested, let available):
+                return "Memory exceeds available: \(requested)GB requested, \(available)GB available"
+            case .diskTooSmall(let requested, let minimum):
+                return "Disk size too small: \(requested)GB requested, minimum \(minimum)GB"
+            case .diskShrinkNotSupported(let current, let requested):
+                return "Cannot shrink disk from \(current)GB to \(requested)GB"
+            case .insufficientDiskSpace(let available, let required):
+                return "Insufficient disk space: \(available)GB available, \(required)GB required"
+            case .cpuReductionTooLarge, .memoryReductionTooLarge, .diskSpaceCheckFailed:
+                return "VM configuration validation failed"
+            }
+        }
+        
+        var recoverySuggestion: String? {
+            switch self {
+            case .cpuCountExceedsAvailable, .memoryExceedsAvailable:
+                return "Reduce the allocated resources to leave some for the host system"
+            case .diskShrinkNotSupported:
+                return "Disk size can only be increased, not decreased"
+            case .insufficientDiskSpace:
+                return "Free up disk space or choose a different location"
+            case .cpuCountTooLow, .cpuCountTooHigh, .cpuReductionTooLarge, .memoryTooLow, .memoryTooHigh, .memoryReductionTooLarge, .diskTooSmall, .diskSpaceCheckFailed:
+                return "Check your configuration and try again"
+            }
+        }
+    }
+    
+    static func cpuCountTooLow(requested: UInt, minimum: UInt) -> Self {
+        return .resource(.cpuCountTooLow(requested: requested, minimum: minimum))
+    }
+    
+    static func cpuCountTooHigh(requested: UInt, maximum: UInt) -> Self {
+        return .resource(.cpuCountTooHigh(requested: requested, maximum: maximum))
+    }
+    
+    static func cpuCountExceedsAvailable(requested: UInt, available: UInt) -> Self {
+        return .resource(.cpuCountExceedsAvailable(requested: requested, available: available))
+    }
+    
+    static func cpuReductionTooLarge(current: UInt, requested: UInt) -> Self {
+        return .resource(.cpuReductionTooLarge(current: current, requested: requested))
+    }
+    
+    static func memoryTooLow(requested: UInt, minimum: UInt) -> Self {
+        return .resource(.memoryTooLow(requested: requested, minimum: minimum))
+    }
+    
+    static func memoryTooHigh(requested: UInt, maximum: UInt) -> Self {
+        return .resource(.memoryTooHigh(requested: requested, maximum: maximum))
+    }
+    
+    static func memoryExceedsAvailable(requested: UInt, available: UInt) -> Self {
+        return .resource(.memoryExceedsAvailable(requested: requested, available: available))
+    }
+    
+    static func memoryReductionTooLarge(current: UInt, requested: UInt) -> Self {
+        return .resource(.memoryReductionTooLarge(current: current, requested: requested))
+    }
+    
+    static func diskTooSmall(requested: UInt, minimum: UInt) -> Self {
+        return .resource(.diskTooSmall(requested: requested, minimum: minimum))
+    }
+    
+    static func diskShrinkNotSupported(current: UInt, requested: UInt) -> Self {
+        return .resource(.diskShrinkNotSupported(current: current, requested: requested))
+    }
+    
+    static func insufficientDiskSpace(available: UInt, required: UInt) -> Self {
+        return .resource(.insufficientDiskSpace(available: available, required: required))
+    }
+    
+    static func diskSpaceCheckFailed(underlying: Error) -> Self {
+        return .resource(.diskSpaceCheckFailed(underlying: underlying))
+    }
+}
+
+extension VMValidationError {
+    enum RestoreImageValidationError: LocalizedError {
+        case restoreImageNotFound(url: URL)
+        case restoreImageTooSmall(url: URL, size: Int64)
+        case restoreImageAccessError(url: URL, underlying: Error)
+        case invalidRestoreImage(url: URL, underlying: Error)
+        
+        var errorDescription: String? {
+            switch self {
+            case .restoreImageNotFound(let url):
+                return "Restore image not found at \(url.lastPathComponent)"
+            case .invalidRestoreImage(let url, _):
+                return "Invalid restore image: \(url.lastPathComponent)"
+            case .restoreImageTooSmall, .restoreImageAccessError:
+                return "VM configuration validation failed"
+            }
+        }
+        
+        var recoverySuggestion: String? {
+            switch self {
+            case .invalidRestoreImage:
+                return "Select a valid macOS restore image (.ipsw file)"
+            case .restoreImageNotFound, .restoreImageTooSmall, .restoreImageAccessError:
+                return "Check your configuration and try again"
+            }
+        }
+    }
+    
+    static func restoreImageNotFound(url: URL) -> Self {
+        return .restoreImage(.restoreImageNotFound(url: url))
+    }
+    
+    static func restoreImageTooSmall(url: URL, size: Int64) -> Self {
+        return .restoreImage(.restoreImageTooSmall(url: url, size: size))
+    }
+    
+    static func restoreImageAccessError(url: URL, underlying: Error) -> Self {
+        return .restoreImage(.restoreImageAccessError(url: url, underlying: underlying))
+    }
+    
+    static func invalidRestoreImage(url: URL, underlying: Error) -> Self {
+        return .restoreImage(.invalidRestoreImage(url: url, underlying: underlying))
+    }
+}
+
+extension VMValidationError {
+    enum HardwareModelValidationError: LocalizedError {
+        case hardwareModelNotFound(bundlePath: VMBundlePath)
+        case invalidHardwareModel(bundlePath: VMBundlePath)
+        case hardwareModelNotSupported(bundlePath: VMBundlePath)
+        case hardwareModelReadError(bundlePath: VMBundlePath, underlying: Error)
+        
+        var errorDescription: String? {
+            switch self {
+            case .hardwareModelNotSupported:
+                return "Hardware model is not supported on this system"
+            case .hardwareModelNotFound, .invalidHardwareModel, .hardwareModelReadError:
+                return "VM configuration validation failed"
+            }
+        }
+        
+        var recoverySuggestion: String? {
+            switch self {
+            case .hardwareModelNotFound, .invalidHardwareModel, .hardwareModelNotSupported, .hardwareModelReadError:
+                return "Check your configuration and try again"
+            }
+        }
+    }
+    
+    static func hardwareModelNotFound(bundlePath: VMBundlePath) -> Self {
+        return .hardwareModel(.hardwareModelNotFound(bundlePath: bundlePath))
+    }
+    
+    static func invalidHardwareModel(bundlePath: VMBundlePath) -> Self {
+        return .hardwareModel(.invalidHardwareModel(bundlePath: bundlePath))
+    }
+    
+    static func hardwareModelNotSupported(bundlePath: VMBundlePath) -> Self {
+        return .hardwareModel(.hardwareModelNotSupported(bundlePath: bundlePath))
+    }
+    
+    static func hardwareModelReadError(bundlePath: VMBundlePath, underlying: Error) -> Self {
+        return .hardwareModel(.hardwareModelReadError(bundlePath: bundlePath, underlying: underlying))
+    }
+}
+
+extension VMValidationError {
+    enum ConfigurationValidationError: LocalizedError {
+        case configurationValidationFailed(underlying: Error)
+        case saveRestoreNotSupported(underlying: Error)
+        
+        var errorDescription: String? {
+            switch self {
+            case .configurationValidationFailed, .saveRestoreNotSupported:
+                return "VM configuration validation failed"
+            }
+        }
+        
+        var recoverySuggestion: String? {
+            switch self {
+            case .configurationValidationFailed, .saveRestoreNotSupported:
+                return "Check your configuration and try again"
+            }
+        }
+    }
+    
+    static func configurationValidationFailed(underlying: Error) -> Self {
+        return .configuration(.configurationValidationFailed(underlying: underlying))
+    }
+    
+    static func saveRestoreNotSupported(underlying: Error) -> Self {
+        return .configuration(.saveRestoreNotSupported(underlying: underlying))
+    }
+}
+
+extension VMValidationError {
+    enum NameAndPathValidationError: LocalizedError {
+        case nameEmpty
+        case nameTooLong(name: String, maxLength: Int)
+        case nameContainsInvalidCharacters(name: String)
+        case nameHasLeadingOrTrailingWhitespace(name: String)
+        case nameIsReserved(name: String)
+
+        case containerPathNotFound(url: URL)
+        case containerPathNotDirectory(url: URL)
+        case containerPathNotWritable(url: URL)
+        
+        var errorDescription: String? {
+            switch self {
+            case .nameEmpty:
+                return "VM name cannot be empty"
+            case .nameContainsInvalidCharacters(let name):
+                return "VM name '\(name)' contains invalid characters"
+            case .nameHasLeadingOrTrailingWhitespace(let name):
+                return "VM name '\(name)' contains leading or trailing whitespace"
+            case .containerPathNotWritable(let url):
+                return "Cannot write to selected path: \(url.path(percentEncoded: false))"
+            case .nameTooLong, .nameIsReserved, .containerPathNotFound, .containerPathNotDirectory:
+                return "VM configuration validation failed"
+            }
+        }
+        
+        var recoverySuggestion: String? {
+            switch self {
+            case .nameContainsInvalidCharacters:
+                return "Use only letters, numbers, spaces, and basic punctuation"
+            case .containerPathNotWritable:
+                return "Choose a different location or check folder permissions"
+            case .nameEmpty, .nameTooLong, .nameHasLeadingOrTrailingWhitespace, .nameIsReserved, .containerPathNotFound, .containerPathNotDirectory:
+                return "Check your configuration and try again"
+            }
+        }
+    }
+    
+    static let nameEmpty: Self = .nameAndPath(.nameEmpty)
+    
+    static func nameTooLong(name: String, maxLength: Int) -> Self {
+        return .nameAndPath(.nameTooLong(name: name, maxLength: maxLength))
+    }
+    
+    static func nameContainsInvalidCharacters(name: String) -> Self {
+        return .nameAndPath(.nameContainsInvalidCharacters(name: name))
+    }
+    
+    static func nameHasLeadingOrTrailingWhitespace(name: String) -> Self {
+        return .nameAndPath(.nameHasLeadingOrTrailingWhitespace(name: name))
+    }
+    
+    static func nameIsReserved(name: String) -> Self {
+        return .nameAndPath(.nameIsReserved(name: name))
+    }
+    
+    static func containerPathNotFound(url: URL) -> Self {
+        return .nameAndPath(.containerPathNotFound(url: url))
+    }
+    
+    static func containerPathNotDirectory(url: URL) -> Self {
+        return .nameAndPath(.containerPathNotDirectory(url: url))
+    }
+    
+    static func containerPathNotWritable(url: URL) -> Self {
+        return .nameAndPath(.containerPathNotWritable(url: url))
     }
 }
 
