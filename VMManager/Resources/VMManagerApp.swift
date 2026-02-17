@@ -4,6 +4,8 @@ import SwiftData
 // Get rid of fatalErrors and swap them with runtime user-interactive errors (graceful failure) (also fix try?s and try!s)
 // Handle relevant TODOs
 // Seperation of concerns/better project structure
+// Shared clipboard between VM and host
+// Drag and drop files between VM and host
 
 @main
 struct VMManagerApp: App {
