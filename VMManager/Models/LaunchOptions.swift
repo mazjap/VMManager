@@ -5,6 +5,7 @@ struct LaunchOptions: Hashable, Codable {
     var cpuCores: UInt = 0
     var memoryGb: UInt = 0
     var storageGb: UInt = 0
+    var sharesClipboard = false
 }
 
 // TODO: - Test the hell out of this
@@ -18,7 +19,8 @@ struct BinaryMetadataCoder {
         data.append(contentsOf: Self.bytesFromUInt(launchOptions.memoryGb))
         data.append(2)
         data.append(contentsOf: Self.bytesFromUInt(launchOptions.storageGb))
-        
+        data.append(3)
+        data.append(contentsOf: Self.bytesFromUInt(launchOptions.sharesClipboard ? 1 : 0)) // Use UInt64 for alignment purposes
         
         return Data(data)
     }
@@ -35,6 +37,13 @@ struct BinaryMetadataCoder {
         launchOptions.cpuCores = Self.uint(from: Array(data[1...8]))
         launchOptions.memoryGb = Self.uint(from: Array(data[10...17]))
         launchOptions.storageGb = Self.uint(from: Array(data[19...26]))
+        
+        launchOptions.sharesClipboard =
+            if data.count > 27, data[27] == 3 {
+                Self.uint(from: Array(data[28...35])) != 0
+            } else {
+                false
+            }
         
         return launchOptions
     }
