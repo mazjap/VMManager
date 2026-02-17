@@ -419,6 +419,18 @@ class VMLifecycleService {
         config.pointingDevices = [VMConfigHelper.createPointingDeviceConfiguration()]
         config.keyboards = VMConfigHelper.createKeyboardConfiguration()
         
+        let spiceAgent = VZSpiceAgentPortAttachment()
+        spiceAgent.sharesClipboard = true//options.sharesClipboard
+        
+        let portConfig = VZVirtioConsolePortConfiguration()
+        portConfig.attachment = spiceAgent
+        portConfig.name = "Shared Clipboard Port"
+        
+        let consoleDeviceConfiguration = VZVirtioConsoleDeviceConfiguration()
+        consoleDeviceConfiguration.ports[0] = portConfig
+        
+        config.consoleDevices = [consoleDeviceConfiguration]
+        
         try validator.validateVMConfiguration(config)
         
         return config
