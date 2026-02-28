@@ -420,11 +420,11 @@ class VMLifecycleService {
         config.keyboards = VMConfigHelper.createKeyboardConfiguration()
         
         let spiceAgent = VZSpiceAgentPortAttachment()
-        spiceAgent.sharesClipboard = true//options.sharesClipboard
+        spiceAgent.sharesClipboard = options.sharesClipboard // TODO: Ask the user to install some VM tools to allow for clipboard sharing
         
         let portConfig = VZVirtioConsolePortConfiguration()
         portConfig.attachment = spiceAgent
-        portConfig.name = VZSpiceAgentPortAttachment.spiceAgentPortName
+        portConfig.name = VZSpiceAgentPortAttachment.spiceAgentPortName // Requires SPICE agent running inside of guest VM (UTM's vd_agent https://github.com/utmapp/vd_agent)
         
         let consoleDeviceConfiguration = VZVirtioConsoleDeviceConfiguration()
         consoleDeviceConfiguration.ports[0] = portConfig
