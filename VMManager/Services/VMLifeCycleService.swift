@@ -424,7 +424,7 @@ class VMLifecycleService {
         
         let portConfig = VZVirtioConsolePortConfiguration()
         portConfig.attachment = spiceAgent
-        portConfig.name = "Shared Clipboard Port"
+        portConfig.name = VZSpiceAgentPortAttachment.spiceAgentPortName
         
         let consoleDeviceConfiguration = VZVirtioConsoleDeviceConfiguration()
         consoleDeviceConfiguration.ports[0] = portConfig
