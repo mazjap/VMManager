@@ -20,16 +20,18 @@ enum FilePickerState {
 }
 
 enum VMCreationStep: Int, CaseIterable {
-    case vmType = 0
-    case nameAndPath = 1
-    case resources = 2
-    case review = 3
+    case vmType
+    case nameAndPath
+    case resources
+    case sharing
+    case review
     
     var title: String {
         switch self {
         case .vmType: return "Choose Type"
         case .nameAndPath: return "Name & Path"
         case .resources: return "Resources"
+        case .sharing: return "Sharing"
         case .review: return "Review"
         }
     }
@@ -39,6 +41,7 @@ enum VMCreationStep: Int, CaseIterable {
         case .vmType: return "square.grid.2x2"
         case .nameAndPath: return "textformat.abc"
         case .resources: return "cpu"
+        case .sharing: return "rectangle.2.swap"
         case .review: return "checkmark.circle"
         }
     }
@@ -96,6 +99,8 @@ struct CreateNewVMView: View {
             return !vmName.isEmpty
         case .resources:
             return spaceAvailableInGb > 32
+        case .sharing:
+            return true
         case .review:
             return true
         }
@@ -114,6 +119,8 @@ struct CreateNewVMView: View {
                 nameAndLocationStep
             case .resources:
                 resourcesStep
+            case .sharing:
+                sharingStep
             case .review:
                 reviewStep
             }
@@ -181,6 +188,10 @@ struct CreateNewVMView: View {
             launchOptions: $model.launchOptions,
             spaceAvailableInGb: spaceAvailableInGb
         )
+    }
+    
+    private var sharingStep: some View {
+        SharingStep(launchOptions: $model.launchOptions)
     }
     
     private var reviewStep: some View {
