@@ -28,20 +28,40 @@ fileprivate struct _EditLaunchOptionsView: View {
     var body: some View {
         let bindable = Bindable(model)
         
-        ZStack {
-            VStack(spacing: 0) {
-                header
-                
-                Divider()
-                
-                ResourcesStep(
-                    launchOptions: bindable.launchOptions,
-                    spaceAvailableInGb: model.spaceAvailableInGb
-                )
-                
-                Divider()
-                
-                footer
+        TabView {
+            Tab {
+                VStack(spacing: 0) {
+                    header
+                    
+                    Divider()
+                    
+                    ResourcesStep(
+                        launchOptions: bindable.launchOptions,
+                        spaceAvailableInGb: model.spaceAvailableInGb
+                    )
+                    
+                    Divider()
+                    
+                    footer
+                }
+            } label: {
+                Label("Resources", systemImage: "cpu")
+            }
+            
+            Tab {
+                VStack(spacing: 0) {
+                    header
+                    
+                    Divider()
+                    
+                    SharingStep(launchOptions: bindable.launchOptions)
+                    
+                    Divider()
+                    
+                    footer
+                }
+            } label: {
+                Label("Sharing", systemImage: "rectangle.2.swap")
             }
         }
         .sheet(isPresented: bindable.isSaving) {
