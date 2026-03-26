@@ -1,4 +1,4 @@
-# VM Manager
+# VMManager
 
 A modern, native macOS virtual machine manager built with SwiftUI and Apple's Virtualization framework. Create, launch, and manage macOS virtual machines with a clean, intuitive interface.
 
@@ -7,7 +7,7 @@ A modern, native macOS virtual machine manager built with SwiftUI and Apple's Vi
 
 ## Overview
 
-VM Manager provides a streamlined experience for managing macOS virtual machines on Apple Silicon. Built entirely with native Apple technologies, it offers fast performance and deep integration with macOS.
+VMManager provides a streamlined experience for managing macOS virtual machines on Apple Silicon. Built entirely with native Apple technologies, it offers fast performance and deep integration with macOS.
 
 ## Features
 
@@ -49,7 +49,7 @@ VM Manager provides a streamlined experience for managing macOS virtual machines
 
 ## Planned Features
 
-Future enhancements planned for VM Manager:
+Future enhancements planned for VMManager:
 
 - **Linux Support** - Create and run Linux virtual machines
 - **Advanced Monitoring** - Real-time VM performance metrics and resource usage
@@ -119,9 +119,9 @@ The VM will automatically download macOS from Apple and complete installation. T
 3. Navigate to an existing `.bundle` file
 4. The VM will appear in your list immediately
 
-## Architecture
+## Tech Stack
 
-VM Manager is built with:
+VMManager is built with:
 
 - **SwiftUI** - Modern, declarative UI framework
 - **SwiftData** - Persistent storage for VM metadata
@@ -134,7 +134,7 @@ This project is not currently accepting contributions.
 
 ## Acknowledgments
 
-Built with Apple's Virtualization framework and inspired by the need for a simple, native macOS VM manager.
+Built with Apple's Virtualization framework and inspired by the need for a simple, native macOS VMManager.
 
 ## Support
 
